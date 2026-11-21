@@ -1,0 +1,347 @@
+@import 'tailwindcss';
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ------------------------------------------------------------------ design tokens */
+:root {
+  /* Light-first mint / deep-teal palette (from the Stitch design): pale mint page, white cards, thin borders. */
+  --bg: #edf5f3;
+  --elev: #ffffff;
+  --soft: #e3efec;
+  --fg: #0f2a28;
+  --muted: #4f6764;
+  --line: #d3e4e0;
+
+  --accent: #0f6b64;
+  --accent-fg: #ffffff;
+  --accent-soft: #d6eeea;
+  --accent-text: #0a5650;
+
+  --saffron: #f59e0b;
+  --saffron-soft: #fdefd0;
+  --saffron-text: #8a500a;
+
+  --ok: #15803d;
+  --ok-soft: #dcf3e3;
+  --warn: #b45309;
+  --warn-soft: #fdecd0;
+  --danger: #b91c1c;
+  --danger-soft: #fde4e2;
+
+  --shadow-card: 0 1px 2px rgb(15 60 56 / 0.05), 0 8px 24px -14px rgb(15 60 56 / 0.18);
+  --shadow-pop: 0 12px 40px -8px rgb(15 60 56 / 0.3);
+  color-scheme: light;
+}
+
+.dark {
+  --bg: #0a1514;
+  --elev: #101e1d;
+  --soft: #162826;
+  --fg: #e8f1ef;
+  --muted: #9db4b0;
+  --line: #213735;
+
+  --accent: #0e857b;
+  --accent-fg: #ffffff;
+  --accent-soft: #0f2f2c;
+  --accent-text: #5eead4;
+
+  --saffron: #fbbf24;
+  --saffron-soft: #35270b;
+  --saffron-text: #fcd34d;
+
+  --ok: #4ade80;
+  --ok-soft: #0f2d1b;
+  --warn: #fbbf24;
+  --warn-soft: #35270b;
+  --danger: #f87171;
+  --danger-soft: #3a1616;
+
+  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.4), 0 10px 28px -14px rgb(0 0 0 / 0.6);
+  --shadow-pop: 0 12px 40px -8px rgb(0 0 0 / 0.7);
+  color-scheme: dark;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-elev: var(--elev);
+  --color-soft: var(--soft);
+  --color-fg: var(--fg);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-accent: var(--accent);
+  --color-accent-fg: var(--accent-fg);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-text: var(--accent-text);
+  --color-saffron: var(--saffron);
+  --color-saffron-soft: var(--saffron-soft);
+  --color-saffron-text: var(--saffron-text);
+  --color-ok: var(--ok);
+  --color-ok-soft: var(--ok-soft);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --shadow-card: var(--shadow-card);
+  --shadow-pop: var(--shadow-pop);
+  --font-sans:
+    ui-sans-serif, system-ui, -apple-system, 'Segoe UI', 'Noto Sans', 'Nirmala UI', 'Noto Sans Devanagari', 'Noto Sans Telugu', 'Noto Sans Tamil',
+    'Noto Sans Kannada', 'Noto Sans Malayalam', 'Noto Sans Bengali', 'Noto Sans Gujarati', 'Noto Sans Gurmukhi', 'Noto Sans Oriya', 'Noto Sans Arabic',
+    Roboto, sans-serif;
+}
+
+/* ------------------------------------------------------------------ base */
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overscroll-behavior-y: none;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--accent) 28%, transparent);
+}
+
+.scroll-thin {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--muted) 40%, transparent) transparent;
+}
+
+/* ------------------------------------------------------------------ reusable surfaces */
+.card {
+  background: var(--elev);
+  border: 1px solid var(--line);
+  border-radius: 1.25rem;
+  box-shadow: var(--shadow-card);
+}
+
+/* Small uppercase section label used above groups of controls. */
+.label-caps {
+  font-size: 0.6875rem;
+  font-weight: 650;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.no-scrollbar {
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.glass {
+  background: color-mix(in srgb, var(--elev) 72%, transparent);
+  backdrop-filter: blur(14px) saturate(1.4);
+  -webkit-backdrop-filter: blur(14px) saturate(1.4);
+  border: 1px solid color-mix(in srgb, var(--line) 80%, transparent);
+}
+
+.bg-brand {
+  background: linear-gradient(135deg, #14877d 0%, #0f6b64 55%, #0a4f4a 100%);
+}
+
+/* Dark-teal hero surface (next appointment). */
+.bg-hero {
+  background: linear-gradient(145deg, #0f6b64 0%, #0b5750 60%, #08443f 100%);
+}
+
+.text-brand {
+  background: linear-gradient(120deg, var(--accent-text), #0f6b64);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Kept as a class so existing pages keep working; the new design uses a flat mint page. */
+.page-glow {
+  background: transparent;
+}
+
+.skeleton {
+  background: linear-gradient(90deg, var(--soft) 25%, color-mix(in srgb, var(--soft) 55%, var(--elev)) 50%, var(--soft) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s linear infinite;
+  border-radius: 0.6rem;
+}
+
+/* ------------------------------------------------------------------ animation */
+@keyframes shimmer {
+  to {
+    background-position: -200% 0;
+  }
+}
+@keyframes ripple {
+  0% {
+    transform: scale(0.85);
+    opacity: 0.55;
+  }
+  100% {
+    transform: scale(2.1);
+    opacity: 0;
+  }
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes breathe {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.9;
+  }
+  50% {
+    transform: scale(1.06);
+    opacity: 1;
+  }
+}
+@keyframes dot {
+  0%,
+  80%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.45;
+  }
+  40% {
+    transform: translateY(-4px);
+    opacity: 1;
+  }
+}
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.anim-ripple {
+  animation: ripple 2.4s cubic-bezier(0.2, 0.6, 0.3, 1) infinite;
+}
+.anim-spin-slow {
+  animation: spin 1.6s linear infinite;
+}
+.anim-breathe {
+  animation: breathe 3.2s ease-in-out infinite;
+}
+.anim-dot {
+  animation: dot 1.2s ease-in-out infinite;
+}
+.anim-fade-up {
+  animation: fade-up 0.28s ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ------------------------------------------------------------------ markdown */
+.prose-chat {
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.prose-chat > :first-child {
+  margin-top: 0;
+}
+.prose-chat > :last-child {
+  margin-bottom: 0;
+}
+.prose-chat p {
+  margin: 0.5em 0;
+}
+.prose-chat ul,
+.prose-chat ol {
+  margin: 0.5em 0;
+  padding-left: 1.3em;
+}
+.prose-chat ul {
+  list-style: disc;
+}
+.prose-chat ol {
+  list-style: decimal;
+}
+.prose-chat li {
+  margin: 0.2em 0;
+}
+.prose-chat a {
+  color: var(--accent-text);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.prose-chat h1,
+.prose-chat h2,
+.prose-chat h3 {
+  font-weight: 650;
+  margin: 0.9em 0 0.4em;
+  line-height: 1.3;
+}
+.prose-chat h1 {
+  font-size: 1.2em;
+}
+.prose-chat h2 {
+  font-size: 1.1em;
+}
+.prose-chat h3 {
+  font-size: 1.02em;
+}
+.prose-chat blockquote {
+  border-left: 3px solid var(--line);
+  padding-left: 0.8em;
+  color: var(--muted);
+  margin: 0.6em 0;
+}
+.prose-chat code:not(pre code) {
+  background: var(--soft);
+  border-radius: 0.35rem;
+  padding: 0.1em 0.35em;
+  font-size: 0.9em;
+  font-family: ui-monospace, 'Cascadia Code', Menlo, monospace;
+}
+.prose-chat table {
+  border-collapse: collapse;
+  display: block;
+  overflow-x: auto;
+  margin: 0.6em 0;
+  font-size: 0.92em;
+}
+.prose-chat th,
+.prose-chat td {
+  border: 1px solid var(--line);
+  padding: 0.35em 0.7em;
+  text-align: left;
+}
+.prose-chat th {
+  background: var(--soft);
+}
+.prose-chat hr {
+  border: 0;
+  border-top: 1px solid var(--line);
+  margin: 0.8em 0;
+}

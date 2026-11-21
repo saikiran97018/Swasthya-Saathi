@@ -1,0 +1,76 @@
+# Render Blueprint: one web service (the API + the built web app, from ./Dockerfile) and one PostgreSQL database.
+# Render reads this file when you create a Blueprint from the GitHub repository.
+#
+# Keys marked `sync: false` are NOT stored here. Render asks you for them in its dashboard (it never reads them from git).
+# Everything else is safe to publish.
+databases:
+  - name: swasthya-db
+    databaseName: voiceagent
+    user: voiceagent
+    plan: free # free databases are deleted after 30 days; use a paid plan for anything lasting
+
+services:
+  - type: web
+    name: swasthya-saathi
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    plan: free # free services sleep after 15 minutes without traffic (first request after that takes about a minute)
+    healthCheckPath: /api/v1/health
+    envVars:
+      # ---- wiring (no secrets) ----
+      - key: ENVIRONMENT
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: swasthya-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: TRUST_PROXY_HEADERS
+        value: "true" # behind Render's proxy: rate limits then count each visitor, not the proxy
+      - key: AUTO_SEED
+        value: "true"
+      - key: DEMO_MODE
+        value: "false"
+      - key: SEED_DEMO_PROVIDERS
+        value: "false"
+      - key: PLACES_ENABLED
+        value: "true"
+      # AGORA_PUBLIC_URL is not needed: Render's own address (RENDER_EXTERNAL_URL) is used for live calls automatically.
+
+      # ---- models ----
+      - key: LLM_BASE_URL
+        value: https://api.groq.com/openai/v1
+      - key: LLM_MODEL
+        value: openai/gpt-oss-120b
+      - key: LLM_EXTRA_BODY
+        value: '{"reasoning_effort":"low"}'
+      - key: LLM_API_KEY # your Groq key
+        sync: false
+      - key: LLM_FALLBACK_BASE_URL
+        value: https://api.sarvam.ai/v1
+      - key: LLM_FALLBACK_MODEL
+        value: sarvam-105b-conversations
+      - key: LLM_FALLBACK_API_KEY # your Sarvam key
+        sync: false
+
+      # ---- speech ----
+      - key: SPEECH_PROVIDER
+        value: bhashini
+      - key: SPEECH_FALLBACK_PROVIDER
+        value: auto
+      - key: BHASHINI_USER_ID
+        sync: false
+      - key: BHASHINI_ULCA_API_KEY
+        sync: false
+      - key: SARVAM_API_KEY # same Sarvam key as above (speech backup)
+        sync: false
+
+      # ---- live voice calls (Agora Conversational AI + Murf Falcon) ----
+      - key: AGORA_APP_ID
+        sync: false
+      - key: AGORA_APP_CERTIFICATE
+        sync: false
+      - key: MURF_API_KEY
+        sync: false
