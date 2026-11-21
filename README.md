@@ -57,7 +57,7 @@ Real screens from the running app. *These were captured in a test run where a sc
 
 | Area | Status |
 |---|---|
-| Backend logic and all API routes | **348 automated tests**: 347 pass on SQLite (one needs PostgreSQL row locks and is skipped there), and all 348 pass on a real PostgreSQL 17 database; the new migrations ran on the real database. Frontend: 183 tests, type check and build clean |
+| Backend logic and all API routes | **365 automated tests**: 364 pass on SQLite (one needs PostgreSQL row locks and is skipped there), and all 365 pass on a real PostgreSQL 17 database; the migrations ran on the real database. Frontend: 191 tests, type check and build clean |
 | Database schema | Alembic migration applied to PostgreSQL; model-vs-schema drift check is clean |
 | Double-booking protection, confirmation gate, reminders, failover | Covered by tests (including two users racing for one slot) |
 | Frontend | 79 unit tests, strict type-check and production build pass |
@@ -181,19 +181,19 @@ What is verified: the Murf key and all 10 voices (live), the exact request sent 
 
 ```powershell
 cd backend
-.\.venv\Scripts\python.exe -m pytest                 # 347 pass + 1 skipped (PostgreSQL-only); SQLite in memory, no keys or network
+.\.venv\Scripts\python.exe -m pytest                 # 364 pass + 1 skipped (PostgreSQL-only); SQLite in memory, no keys or network
 ```
 
 Run the same suite on **PostgreSQL** (use a dedicated database whose name ends in `_test`; its tables are dropped before every test, and the run refuses any other name):
 
 ```powershell
 $env:TEST_DATABASE_URL = "postgresql+asyncpg://postgres:<password>@localhost:5432/voiceagent_test"
-.\.venv\Scripts\python.exe -m pytest                 # 348 pass, including the row-locking test for the reminder loop
+.\.venv\Scripts\python.exe -m pytest                 # 365 pass, including the row-locking test for the reminder loop
 ```
 
 ```powershell
 cd ..\frontend
-npm test                                              # 183 tests
+npm test                                              # 191 tests
 npm run typecheck ; npm run build
 ```
 
