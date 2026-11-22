@@ -164,6 +164,9 @@ class PreferencesOut(BaseModel):
     tts_gender: Literal["female", "male"]
     show_tool_details: bool
     silence_timeout_ms: int
+    symptom_checkins: bool = True
+    sms_reminders: bool = False
+    sms_available: bool = False  # whether this server can send texts at all (set from the server's settings, not stored)
     primary_language: str = "en"
     secondary_languages: list[str] = []
 
@@ -173,6 +176,8 @@ class PreferencesUpdate(BaseModel):
     voice_output_enabled: bool | None = None
     auto_play_responses: bool | None = None
     auto_send_voice: bool | None = None
+    sms_reminders: bool | None = None
+    symptom_checkins: bool | None = None
     auto_detect_language: bool | None = None
     tts_gender: Literal["female", "male"] | None = None
     show_tool_details: bool | None = None
@@ -287,7 +292,7 @@ class CancelIn(BaseModel):
 
 class NotificationOut(BaseModel):
     id: uuid.UUID
-    kind: Literal["appointment_reminder", "follow_up", "feedback_request"]
+    kind: Literal["appointment_reminder", "follow_up", "feedback_request", "medicine", "symptom_checkin", "vaccine"]
     title: str
     message: str = Field(description="Text in the user's language when translation was available")
     language: str

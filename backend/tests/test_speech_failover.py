@@ -152,7 +152,7 @@ def test_voice_keeps_working_through_sarvam_when_bhashini_is_down():
         said = c.post(f"{P}/voice/synthesize", json={"text": "నమస్కారం", "language": "te"}, headers=h)
         assert said.status_code == 200 and said.content[:4] == b"RIFF" and len(sarvam.tts_calls) == 1
         heard = c.post(f"{P}/voice/transcribe", files={"audio": ("a.wav", make_wav(2.0), "audio/wav")}, data={"language": "te"}, headers=h)
-        assert heard.status_code == 200 and heard.json()["text"] == "నాకు జ్వరం ఉంది" and sarvam.stt_calls[0]["language_code"] == "te-IN"
+        assert heard.status_code == 200 and heard.json()["text"] == "నాకు జ్వరం ఉంది" and len(sarvam.stt_calls) == 1  # Sarvam answered (it detects the language itself)
 
 
 def test_backup_is_not_called_while_bhashini_is_healthy():

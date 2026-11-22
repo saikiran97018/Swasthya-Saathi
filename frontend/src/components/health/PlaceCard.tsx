@@ -1,4 +1,4 @@
-import { Building2, CalendarCheck, Clock, Globe, Hospital, MapPin, Phone, Route, Stethoscope, Siren } from 'lucide-react'
+import { Building2, CalendarCheck, Clock, Globe, Hospital, MapPin, Phone, Pill, Route, Star, Stethoscope, Siren } from 'lucide-react'
 import type { Place, PlaceKind } from '@/api/types'
 import { Badge, Button } from '@/components/ui/primitives'
 import { humanize } from '@/lib/format'
@@ -6,7 +6,7 @@ import { directionsLink, distanceLabel, placeAddress, placeKindLabel, safeWebsit
 
 export const specialtyLabel = (s: string) => (s === 'ent' ? 'ENT' : humanize(s))
 
-const KIND_ICON: Record<PlaceKind, typeof Hospital> = { hospital: Hospital, clinic: Building2, doctor: Stethoscope, phc: Building2, other: Building2 }
+const KIND_ICON: Record<PlaceKind, typeof Hospital> = { hospital: Hospital, clinic: Building2, doctor: Stethoscope, phc: Building2, pharmacy: Pill, other: Building2 }
 
 /**
  * A real place near the person. Map places carry no fee, rating or availability, so none is shown:
@@ -18,7 +18,8 @@ export function PlaceCard({ place: p, onSelect }: { place: Place; onSelect: () =
   const address = placeAddress(p)
   const phone = telLinkFor(p.phone)
   const site = safeWebsite(p.website)
-  const book = visitModeFor(p) === 'book'
+  const shop = p.kind === 'pharmacy' // a medical shop is not booked or planned: show where it is and how to reach it
+  const book = !shop && visitModeFor(p) === 'book'
   const hasPoint = Number.isFinite(p.lat) && Number.isFinite(p.lon)
 
   return (
@@ -28,13 +29,16 @@ export function PlaceCard({ place: p, onSelect }: { place: Place; onSelect: () =
         <div className="min-w-0 flex-1">
           <h3 className="leading-snug font-bold break-words">{p.name}</h3>
           <p className="text-sm text-muted">{[placeKindLabel(p.kind), dist].filter(Boolean).join(' · ')}</p>
+          {p.rating != null && (
+            <p className="mt-0.5 flex items-center gap-1 text-sm"><Star className="size-3.5 fill-current text-saffron-text" aria-hidden /><span className="font-medium">{p.rating.toFixed(1)}</span>{p.rating_count != null && <span className="text-muted">({p.rating_count})</span>}<span className="sr-only"> on Google</span></p>
+          )}
         </div>
       </div>
 
       <div className="mt-3 flex flex-wrap items-center gap-1.5">
         {p.emergency && <Badge tone="danger"><Siren className="size-3" aria-hidden /> Emergency services</Badge>}
         {book && <Badge tone="ok"><CalendarCheck className="size-3" aria-hidden /> Online booking</Badge>}
-        {p.specialties.slice(0, 4).map((s) => <Badge key={s} tone="accent">{specialtyLabel(s)}</Badge>)}
+        {p.specialties.slice(0, 4).map((s) => <Badge key={s} tone="accent">{s === 'jan aushadhi' ? 'Jan Aushadhi: low-cost generics' : specialtyLabel(s)}</Badge>)}
       </div>
 
       <div className="mt-3 space-y-1.5 text-sm">
@@ -60,9 +64,11 @@ export function PlaceCard({ place: p, onSelect }: { place: Place; onSelect: () =
             <Route className="size-4" aria-hidden /> Get directions
           </a>
         )}
-        <Button size="sm" variant="primary" className="h-11 flex-1 sm:flex-none" onClick={onSelect} aria-label={`${book ? 'Book an appointment at' : 'Plan a visit to'} ${p.name}`}>
-          {book ? 'Book appointment' : 'Plan a visit'}
-        </Button>
+        {!shop && (
+          <Button size="sm" variant="primary" className="h-11 flex-1 sm:flex-none" onClick={onSelect} aria-label={`${book ? 'Book an appointment at' : 'Plan a visit to'} ${p.name}`}>
+            {book ? 'Book appointment' : 'Plan a visit'}
+          </Button>
+        )}
       </div>
     </article>
   )

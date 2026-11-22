@@ -72,7 +72,15 @@ Token responses: `{access_token, token_type, user:{id,email,display_name,is_gues
 ### Voice
 | Method | Path | Request | Response |
 |---|---|---|---|
-| POST | `/voice/transcribe` | `multipart/form-data`: `audio` (**16-bit PCM mono WAV**, 8-48 kHz, ≤ `max_audio_seconds` from `/health` (30 s on Sarvam), ≤ 10 MB), `language` | `{text, language, duration_seconds}` |
+| GET | `/family/{id}/vaccinations` | A child's vaccination schedule (India's UIP guide): each visit with its vaccines, due date and status `given`/`overdue`/`due`/`upcoming`. Needs the child's `birth_date`; people 17 or older have no schedule |
+| PUT | `/family/{id}/vaccinations/{milestone}` | `{given_on: "YYYY-MM-DD" \| null}`: tick a visit as given (or remove the tick) and rebuild the reminders. Milestones: `birth, 6w, 10w, 14w, 9m, 16m, 5y, 10y, 16y` |
+| POST | `/conversations/{id}/doctor-note` | `{text, source: assistant\|basic}`: a short note for the doctor from the patient's own words. A note that invents facts is replaced by a plain one |
+| GET | `/places/search` | Places near a city or position from Google Maps (when `GOOGLE_MAPS_API_KEY` is set; `source: "google"`, with `rating`, `maps_url`) or OpenStreetMap (`source: "openstreetmap"`). `attribution` says which. Medical-shop searches widen the circle (to 15, then 25 km) when too few are found |
+| GET | `/places/search?kind=pharmacy` | Medical shops near a city or position (OpenStreetMap); Jan Aushadhi Kendras carry the specialty `jan aushadhi`. No partner clinics are mixed in |
+| GET / POST | `/medicine-reminders` | List / add a daily reminder: `{label, times:["08:00"], days}` (max 4 times a day, 180 days, 10 reminders per person) |
+| DELETE | `/medicine-reminders/{series}` | Stop one reminder |
+| PUT / DELETE | `/messages/{id}/feedback` | Thumbs up/down on one of your assistant replies: `{rating: up\|down, reason?: wrong_info\|unsafe\|misunderstood\|not_helpful\|other, note?}`; DELETE withdraws it |
+| GET | `/billing/plans` | `multipart/form-data`: `audio` (**16-bit PCM mono WAV**, 8-48 kHz, ≤ `max_audio_seconds` from `/health` (30 s on Sarvam), ≤ 10 MB), `language` | `{text, language, duration_seconds}` |
 | POST | `/voice/synthesize` | `{text, language, gender?}` | `audio/wav` (markdown/URLs stripped, long text chunked per sentence, cached) |
 
 ### Real places (hospitals and clinics near the user)
@@ -132,7 +140,16 @@ Booking can be done two ways: through the agent (conversation, then a confirmati
 | GET | `/agents/executions?conversation_id=&limit=&offset=` | Run history: status, intent, latency, steps, `tool_executions[]` |
 | POST | `/agents/executions/{tool_execution_id}/confirm` | `{approve: true\|false}` → same shape as `POST /chat` |
 | GET | `/tasks?status=&kind=` · PATCH `/tasks/{id}` | To-dos (`T-…`) and assistance requests (`SR-…`, locked) |
-| GET / PUT | `/preferences` | theme, voice_output_enabled, auto_play_responses, auto_send_voice, auto_detect_language, tts_gender, show_tool_details, silence_timeout_ms, primary_language, secondary_languages |
+| GET | `/billing/plans` | `{enabled, key_id, plans[], features[], free_daily_messages, free_daily_calls}` (Razorpay public key id only) |
+| GET | `/billing/status` | `{plan: free\|plus, status, renews_at, cancel_at_cycle_end, messages_today/limit, calls_today/limit}` (limit null = unlimited) |
+| POST | `/billing/subscribe` | `{plan: monthly\|yearly}` -> `{subscription_id, key_id}` to open Razorpay Checkout. 409 if already on Plus, 503 if payments are not set up |
+| POST | `/billing/verify` | After checkout: `{razorpay_payment_id, razorpay_subscription_id, razorpay_signature}`. The signature is checked (HMAC-SHA256) before anything changes |
+| POST | `/billing/cancel` | Stop renewing; Plus stays until the paid period ends |
+| POST | `/billing/webhook` | Razorpay only: signed with `RAZORPAY_WEBHOOK_SECRET`, each event id applied once |
+| GET | `/push/config` | `{available, public_key, devices}`: the key the browser subscribes with, and how many of your devices get notifications |
+| POST / DELETE | `/push/subscriptions` | Register this phone/browser (`{endpoint, keys:{p256dh, auth}}`, max 10 per person) / forget it (`{endpoint}`) |
+| POST | `/push/test` | Send a test notification to your devices: `{sent}` |
+| GET / PUT | `/preferences` | theme, voice_output_enabled, auto_play_responses, auto_send_voice, sms_reminders (opt-in text reminders; read-only `sms_available` says whether the server can text), auto_detect_language, tts_gender, show_tool_details, silence_timeout_ms, primary_language, secondary_languages |
 | GET | `/dashboard/summary` | counts, tool usage, recent conversations/runs, `upcoming_appointments[]`, `appointments_total`, `unread_notifications` |
 
 `ToolExecutionOut`: `id, execution_id, assistant_message_id, tool_name, arguments, result, summary, explanation, status, requires_confirmation, duration_ms, error, created_at`; `status`: `running | success | error | awaiting_confirmation | denied | cancelled`.

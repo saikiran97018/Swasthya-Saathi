@@ -12,10 +12,11 @@ from app.utils.language import LANGUAGES, is_supported
 router = APIRouter(tags=["preferences"])
 
 
-async def _out(repo: UserRepository, user: User) -> PreferencesOut:
+async def _out(repo: UserRepository, user: User, request: Request) -> PreferencesOut:
     prefs: UserPreference = await repo.get_preferences(user.id)
     langs = await repo.get_languages(user.id)
     base = PreferencesOut.model_validate(prefs)
+    base.sms_available = request.app.state.settings.sms_configured
     base.primary_language = next((l.language_code for l in langs if l.is_primary), "en")
     base.secondary_languages = [l.language_code for l in langs if not l.is_primary]
     return base
@@ -33,12 +34,12 @@ async def languages(request: Request) -> list[LanguageOut]:
 
 
 @router.get("/preferences", response_model=PreferencesOut)
-async def get_preferences(user: User = Depends(get_current_user), session: AsyncSession = Depends(get_session, scope="function")) -> PreferencesOut:
-    return await _out(UserRepository(session), user)
+async def get_preferences(request: Request, user: User = Depends(get_current_user), session: AsyncSession = Depends(get_session, scope="function")) -> PreferencesOut:
+    return await _out(UserRepository(session), user, request)
 
 
 @router.put("/preferences", response_model=PreferencesOut)
-async def update_preferences(body: PreferencesUpdate, user: User = Depends(get_current_user), session: AsyncSession = Depends(get_session, scope="function")) -> PreferencesOut:
+async def update_preferences(body: PreferencesUpdate, request: Request, user: User = Depends(get_current_user), session: AsyncSession = Depends(get_session, scope="function")) -> PreferencesOut:
     repo = UserRepository(session)
     prefs = await repo.get_preferences(user.id)
     data = body.model_dump(exclude_unset=True)
@@ -57,5 +58,5 @@ async def update_preferences(body: PreferencesUpdate, user: User = Depends(get_c
                 raise BadRequest(f"Unsupported language '{code}'", code="language_not_supported")
         await repo.set_languages(user.id, new_primary, list(dict.fromkeys(new_secondary)))
     await session.flush()
-    return await _out(repo, user)
+    return await _out(repo, user, request)
 

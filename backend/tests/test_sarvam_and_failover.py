@@ -70,16 +70,24 @@ def test_bhashini_provider_keeps_its_own_capabilities(client):
 
 def test_transcribe_sends_the_documented_request():
     sarvam = FakeSarvam(transcript="నాకు రేషన్ కార్డ్ కావాలి")
-    with sarvam_app(sarvam) as (c, auth):
+    with sarvam_app(sarvam, sarvam_stt_autodetect=False, sarvam_stt_mode="transcribe") as (c, auth):  # the fixed-language setting
         r = upload(c, auth, make_wav(2.0))
     assert r.status_code == 200 and r.json() == {"text": "నాకు రేషన్ కార్డ్ కావాలి", "language": "te", "duration_seconds": 2.0}
     f = sarvam.stt_calls[0]
     assert f["model"] == "saaras:v4" and f["mode"] == "transcribe" and f["language_code"] == "te-IN"
 
 
+def test_by_default_sarvam_detects_the_language_and_keeps_english_words_in_english():
+    sarvam = FakeSarvam(transcript="నాకు 2 రోజులుగా జ్వరం ఉంది, Guntur-లో మంచి doctor ఉన్నారా?")
+    with sarvam_app(sarvam) as (c, auth):
+        assert upload(c, auth, make_wav(2.0), language="te").status_code == 200
+        assert upload(c, auth, make_wav(2.0), language="hi").status_code == 200  # a Hindi speaker with Telugu selected is still understood
+    assert all(f["mode"] == "codemix" and "language_code" not in f for f in sarvam.stt_calls)
+
+
 def test_language_codes_are_mapped_to_sarvam_spelling():
     sarvam = FakeSarvam()
-    with sarvam_app(sarvam) as (c, auth):
+    with sarvam_app(sarvam, sarvam_stt_autodetect=False) as (c, auth):
         for ours in ("or", "hi", "en", "ml"):
             assert upload(c, auth, make_wav(1.0), language=ours).status_code == 200
     assert [f["language_code"] for f in sarvam.stt_calls] == ["od-IN", "hi-IN", "en-IN", "ml-IN"]  # Odia is od-IN, not or-IN

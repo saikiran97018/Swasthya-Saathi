@@ -6,13 +6,14 @@ PostgreSQL in production and SQLite in the test-suite.
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from typing import Any
 
 from sqlalchemy import (
     JSON,
     Boolean,
     CheckConstraint,
+    Date,
     DateTime,
     Float,
     ForeignKey,
@@ -93,6 +94,8 @@ class UserPreference(IdMixin, TimestampMixin, Base):
     voice_output_enabled: Mapped[bool] = mapped_column(Boolean, default=True)
     auto_play_responses: Mapped[bool] = mapped_column(Boolean, default=True)
     auto_send_voice: Mapped[bool] = mapped_column(Boolean, default=True)  # speaking is enough: no extra Send tap (can be turned off in Settings)
+    symptom_checkins: Mapped[bool] = mapped_column(Boolean, default=True)  # a notification the next day asking how they feel (can be turned off)
+    sms_reminders: Mapped[bool] = mapped_column(Boolean, default=False)  # opt-in: text my reminders to the visit's mobile number
     auto_detect_language: Mapped[bool] = mapped_column(Boolean, default=True)
     tts_gender: Mapped[str] = mapped_column(String(10), default="female")
     show_tool_details: Mapped[bool] = mapped_column(Boolean, default=True)
@@ -276,6 +279,69 @@ class Provider(IdMixin, TimestampMixin, Base):
     opening_hours: Mapped[str | None] = mapped_column(String(300), nullable=True)
 
 
+class PushSubscription(IdMixin, TimestampMixin, Base):
+    """One phone or browser that agreed to receive notifications (Web Push). Having a row IS the opt-in for that device."""
+
+    __tablename__ = "push_subscriptions"
+    __table_args__ = (Index("ix_push_subscriptions_user", "user_id"), Index("ux_push_subscriptions_endpoint", "endpoint", unique=True))
+
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    endpoint: Mapped[str] = mapped_column(Text)  # the push service's private address for this device
+    p256dh: Mapped[str] = mapped_column(String(160))
+    auth: Mapped[str] = mapped_column(String(64))
+    user_agent: Mapped[str | None] = mapped_column(String(200), nullable=True)
+
+
+class Subscription(IdMixin, TimestampMixin, Base):
+    """A person's Saathi Plus subscription at Razorpay. The webhook is the source of truth for `status` and `current_end`."""
+
+    __tablename__ = "subscriptions"
+    __table_args__ = (Index("ix_subscriptions_user", "user_id"), Index("ux_subscriptions_razorpay_id", "razorpay_subscription_id", unique=True))
+
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    plan: Mapped[str] = mapped_column(String(16))  # monthly | yearly
+    razorpay_subscription_id: Mapped[str] = mapped_column(String(64))
+    status: Mapped[str] = mapped_column(String(16), default="created")  # created|authenticated|active|pending|halted|cancelled|completed|paused|expired
+    current_end: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)  # the paid period runs to here
+    cancel_at_cycle_end: Mapped[bool] = mapped_column(Boolean, default=False)
+    paid_count: Mapped[int] = mapped_column(Integer, default=0)
+    last_payment_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+
+
+class MessageFeedback(IdMixin, TimestampMixin, Base):
+    """A thumbs up/down (with a reason) on one assistant reply. Down-votes are reviewed to find wrong or unsafe answers."""
+
+    __tablename__ = "message_feedback"
+    __table_args__ = (UniqueConstraint("user_id", "message_id", name="uq_message_feedback_user_message"), Index("ix_message_feedback_rating", "rating", "created_at"))
+
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    message_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("messages.id", ondelete="CASCADE"), index=True)
+    rating: Mapped[str] = mapped_column(String(4))  # up | down
+    reason: Mapped[str | None] = mapped_column(String(24), nullable=True)  # wrong_info | unsafe | misunderstood | not_helpful | other
+    note: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+class BillingEvent(IdMixin, TimestampMixin, Base):
+    """A webhook event already handled (Razorpay retries, so each event id is processed once)."""
+
+    __tablename__ = "billing_events"
+    __table_args__ = (Index("ux_billing_events_event_id", "event_id", unique=True),)
+
+    event_id: Mapped[str] = mapped_column(String(80))
+    event_type: Mapped[str] = mapped_column(String(48))
+
+
+class VaccinationMilestone(IdMixin, TimestampMixin, Base):
+    """A vaccination visit (for example the 6-week one) that a child has had. The schedule itself is in services/vaccines.py."""
+
+    __tablename__ = "vaccination_milestones"
+    __table_args__ = (UniqueConstraint("family_member_id", "milestone", name="uq_vaccination_member_milestone"),)
+
+    family_member_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("family_members.id", ondelete="CASCADE"), index=True)
+    milestone: Mapped[str] = mapped_column(String(8))
+    given_on: Mapped[date] = mapped_column(Date)
+
+
 class FamilyMember(IdMixin, TimestampMixin, Base):
     """Someone the account holder books care for (a parent, a child ...). Deleting one keeps their past appointments."""
 
@@ -286,6 +352,7 @@ class FamilyMember(IdMixin, TimestampMixin, Base):
     name: Mapped[str] = mapped_column(String(80))
     relation: Mapped[str] = mapped_column(String(16), default="other")  # self|spouse|child|parent|sibling|other
     birth_year: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    birth_date: Mapped[date | None] = mapped_column(Date, nullable=True)  # for the vaccination schedule (a child's exact date of birth)
     gender: Mapped[str | None] = mapped_column(String(10), nullable=True)  # female|male|other
     mobile: Mapped[str | None] = mapped_column(String(15), nullable=True)  # normalised 10-digit Indian mobile
     language: Mapped[str | None] = mapped_column(String(8), nullable=True)

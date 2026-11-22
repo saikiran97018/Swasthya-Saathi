@@ -56,15 +56,21 @@ services:
         sync: false
 
       # ---- speech ----
+      # Sarvam (Saaras speech-to-text + Bulbul text-to-speech) is the only speech provider: the best accuracy for Indian languages.
+      # Bhashini is switched off; to use it again, set SPEECH_PROVIDER=bhashini and add the two keys below.
       - key: SPEECH_PROVIDER
-        value: bhashini
+        value: sarvam
       - key: SPEECH_FALLBACK_PROVIDER
-        value: auto
-      - key: BHASHINI_USER_ID
+        value: none
+      # - key: BHASHINI_USER_ID
+      #   sync: false
+      # - key: BHASHINI_ULCA_API_KEY
+      #   sync: false
+      - key: SARVAM_API_KEY # the same Sarvam key as above
         sync: false
-      - key: BHASHINI_ULCA_API_KEY
-        sync: false
-      - key: SARVAM_API_KEY # same Sarvam key as above (speech backup)
+
+      # ---- optional: Google Maps for clinics and medical shops (OpenStreetMap is the backup) ----
+      - key: GOOGLE_MAPS_API_KEY
         sync: false
 
       # ---- live voice calls (Agora Conversational AI + Murf Falcon) ----
@@ -73,4 +79,22 @@ services:
       - key: AGORA_APP_CERTIFICATE
         sync: false
       - key: MURF_API_KEY
+        sync: false
+      # ---- optional: Saathi Plus subscriptions (Razorpay). Leave blank to keep the app free ----
+      - key: RAZORPAY_KEY_ID
+        sync: false
+      - key: RAZORPAY_KEY_SECRET
+        sync: false
+      - key: RAZORPAY_WEBHOOK_SECRET
+        sync: false
+      - key: RAZORPAY_PLAN_MONTHLY
+        sync: false
+      - key: RAZORPAY_PLAN_YEARLY
+        sync: false
+      # ---- optional: text-message reminders (leave blank to keep reminders in the app only) ----
+      - key: TWILIO_ACCOUNT_SID
+        sync: false
+      - key: TWILIO_AUTH_TOKEN
+        sync: false
+      - key: SMS_FROM
         sync: false

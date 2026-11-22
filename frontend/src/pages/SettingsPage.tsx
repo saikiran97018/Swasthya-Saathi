@@ -1,8 +1,9 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
-import { CircleAlert, CircleCheck, ChevronRight, Languages, Monitor, Moon, Sun, Users } from 'lucide-react'
-import { useHealth, useMe, usePrefs, useUpdateMe, useUpdatePrefs } from '@/api/hooks'
+import { ChevronRight, Languages, Monitor, Moon, Sun, Users } from 'lucide-react'
+import { useMe, usePrefs, useUpdateMe, useUpdatePrefs } from '@/api/hooks'
 import type { Preferences } from '@/api/types'
+import { PhoneNotifications } from '@/components/health/PhoneNotifications'
 import { Badge, Button, PageHeader, Segmented, Skeleton, Toggle } from '@/components/ui/primitives'
 import { useToast } from '@/components/ui/Toast'
 import { useTheme } from '@/hooks/ThemeProvider'
@@ -25,7 +26,6 @@ export default function SettingsPage() {
   const { languages } = useLanguage()
   const { data: me } = useMe()
   const { data: prefs, isLoading, isError: prefsError, refetch: refetchPrefs } = usePrefs()
-  const { data: health, isError: healthError } = useHealth()
   const updateMe = useUpdateMe()
   const update = useUpdatePrefs()
 
@@ -122,6 +122,19 @@ export default function SettingsPage() {
         )}
       </Section>
 
+      <Section title="Reminders" description="How you hear about upcoming visits.">
+        <PhoneNotifications />
+        {prefs && <Toggle checked={prefs.symptom_checkins} onChange={(v) => save({ symptom_checkins: v })} label="Check on me the next day" description="After you tell Saathi how you feel, get a message the next day asking how you are now." />}
+        {prefs?.sms_available && (
+          <Toggle
+            checked={prefs.sms_reminders}
+            onChange={(v) => save({ sms_reminders: v })}
+            label="Also text my reminders"
+            description="A text message goes to the mobile number you gave for the visit. Standard SMS rates may apply."
+          />
+        )}
+      </Section>
+
       <Section title="Chat">
         {prefs && <Toggle checked={prefs.show_tool_details} onChange={(v) => save({ show_tool_details: v })} label="Show action details" description="Let me expand each action Saathi takes to see what was sent and received." />}
         <Link to="/settings/language" className="flex items-center gap-3 py-3.5 transition hover:text-accent-text">
@@ -133,39 +146,6 @@ export default function SettingsPage() {
           <ChevronRight className="size-4 text-muted" aria-hidden />
         </Link>
       </Section>
-
-      <Section title="System status" description="What this server has connected.">
-        {healthError || !health ? (
-          <p className="py-3 text-sm text-danger" role="alert">{healthError ? 'Cannot reach the server.' : 'Checking…'}</p>
-        ) : (
-          <>
-            <Status ok={health.database} label="Database" detail={health.database ? 'Connected' : 'Not reachable'} />
-            <Status
-              ok={health.speech_configured}
-              label={`Speech (${health.speech_provider === 'sarvam' ? 'Sarvam' : 'Bhashini'})`}
-              detail={health.speech_configured ? `Voice input and replies are available · recordings up to ${Math.round(health.max_audio_seconds)} s` : 'Not set up'}
-              hint={health.speech_provider === 'sarvam' ? 'Add SARVAM_API_KEY to backend/.env and restart the server.' : 'Add BHASHINI_USER_ID and BHASHINI_ULCA_API_KEY (or SARVAM_API_KEY) to backend/.env and restart the server.'}
-            />
-            <Status ok={health.llm_configured} label="AI model" detail={health.llm_configured ? `${health.llm_model}${health.llm_fallback_model ? ` · backup: ${health.llm_fallback_model}` : ''}` : 'Not set up'} hint="Add LLM_API_KEY (and LLM_BASE_URL / LLM_MODEL if needed) to backend/.env and restart the server." />
-            <Status ok={health.demo_mode} optional label="Demo mode" detail={health.demo_mode ? 'On: sample clinics, and demo buttons on the Appointments screen' : 'Off'} hint="Sample listings and the demo helpers are for trying the app. Set DEMO_MODE=true in backend/.env to turn them on." />
-            <Status ok={health.web_search_configured} optional label="Web search" detail={health.web_search_configured ? 'Enabled' : 'Off (optional)'} hint="Optional: set TAVILY_API_KEY or SEARXNG_URL to let Saathi look things up online." />
-            <p className="py-3 text-xs text-muted">Server version {health.version}</p>
-          </>
-        )}
-      </Section>
-    </div>
-  )
-}
-
-function Status({ ok, label, detail, hint, optional }: { ok: boolean; label: string; detail: string; hint?: string; optional?: boolean }) {
-  return (
-    <div className="flex items-start gap-3 py-3">
-      {ok ? <CircleCheck className="mt-0.5 size-5 shrink-0 text-ok" aria-label="OK" /> : <CircleAlert className={`mt-0.5 size-5 shrink-0 ${optional ? 'text-muted' : 'text-warn'}`} aria-label={optional ? 'Optional, off' : 'Needs attention'} />}
-      <div className="min-w-0">
-        <div className="text-sm font-medium">{label}</div>
-        <div className="text-sm text-muted">{detail}</div>
-        {!ok && hint && <div className="mt-1 text-xs text-muted">{hint}</div>}
-      </div>
     </div>
   )
 }

@@ -227,9 +227,9 @@ class FakeOSM:
         address = {k: tags.pop(f"addr:{k}") for k in ("street", "city") if f"addr:{k}" in tags}
         if "street" in address:
             address["road"] = address.pop("street")
-        name, amenity = tags.pop("name", None), tags.pop("amenity", None)
+        name, amenity, shop = tags.pop("name", None), tags.pop("amenity", None), tags.pop("shop", None)
         row = {
-            "osm_type": el["type"], "osm_id": el["id"], "lat": str(centre["lat"]), "lon": str(centre["lon"]), "category": "amenity", "type": amenity,
+            "osm_type": el["type"], "osm_id": el["id"], "lat": str(centre["lat"]), "lon": str(centre["lon"]), "category": "amenity" if amenity else "shop", "type": amenity or shop,
             "name": name or "", "namedetails": {"name": name} if name else {}, "extratags": tags, "address": address,
         }
         return row
@@ -262,7 +262,14 @@ class FakeOSM:
                 self.place_searches += 1
                 self.queries.append(str(request.url))
                 amenity = params.get("q", "")
-                return httpx.Response(200, json=[self._row(e) for e in self.elements if e.get("tags", {}).get("amenity") == amenity])
+                left, top, right, bottom = (float(x) for x in params["viewbox"].split(","))  # the search box, like the real service
+
+                def inside(e: dict) -> bool:
+                    c = e.get("center") or {"lat": e.get("lat"), "lon": e.get("lon")}
+                    return bottom <= float(c["lat"]) <= top and left <= float(c["lon"]) <= right
+
+                tagged = lambda e: amenity in (e.get("tags", {}).get("amenity"), e.get("tags", {}).get("shop"))  # noqa: E731
+                return httpx.Response(200, json=[self._row(e) for e in self.elements if tagged(e) and inside(e)])
             self.geocodes += 1
             q = params.get("q", "").strip().lower()
             hit = self.CITIES.get(q)

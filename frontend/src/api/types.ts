@@ -154,6 +154,9 @@ export interface Preferences {
   tts_gender: 'female' | 'male'
   show_tool_details: boolean
   silence_timeout_ms: number
+  symptom_checkins: boolean
+  sms_reminders: boolean
+  sms_available: boolean
   primary_language: string
   secondary_languages: string[]
 }
@@ -307,7 +310,7 @@ export interface Appointment {
   created_at: string
 }
 
-export type NotificationKind = 'appointment_reminder' | 'follow_up' | 'feedback_request'
+export type NotificationKind = 'appointment_reminder' | 'follow_up' | 'feedback_request' | 'medicine' | 'symptom_checkin' | 'vaccine'
 
 export interface AppNotification {
   id: string
@@ -330,10 +333,10 @@ export interface NotificationPage {
 
 // ---------------------------------------------------------------- places (OpenStreetMap + partner clinics)
 
-export type PlaceKind = 'hospital' | 'clinic' | 'doctor' | 'phc' | 'other'
+export type PlaceKind = 'hospital' | 'clinic' | 'doctor' | 'phc' | 'pharmacy' | 'other'
 
 export interface Place {
-  /** 'osm:node/123' for OpenStreetMap places, or the partner provider code. */
+  /** 'osm:node/123' (OpenStreetMap), 'gmaps:<id>' (Google) or the partner provider code. */
   id: string
   name: string
   kind: PlaceKind
@@ -347,7 +350,11 @@ export interface Place {
   lon: number
   distance_km: number | null
   emergency: boolean
-  source: 'openstreetmap' | 'partner'
+  /** Google results only. */
+  rating?: number | null
+  rating_count?: number | null
+  maps_url?: string | null
+  source: 'openstreetmap' | 'google' | 'partner'
   has_slots: boolean
   provider_code: string | null
 }
@@ -365,7 +372,7 @@ export interface PlaceQuery {
   lat?: number
   lon?: number
   radius_km?: number
-  kind?: 'hospital' | 'clinic' | 'doctor'
+  kind?: 'hospital' | 'clinic' | 'doctor' | 'pharmacy'
   q?: string
   specialty?: string
   limit?: number
@@ -382,6 +389,7 @@ export interface FamilyMember {
   name: string
   relation: FamilyRelation
   birth_year: number | null
+  birth_date: string | null
   gender: FamilyGender | null
   mobile: string | null
   language: string | null
@@ -393,12 +401,108 @@ export interface FamilyMemberBody {
   name: string
   relation: FamilyRelation
   birth_year?: number | null
+  birth_date?: string | null
   gender?: FamilyGender | null
   mobile?: string | null
   language?: string | null
 }
 
 // ---------------------------------------------------------------- emergency (SOS)
+
+export interface VaccineItem {
+  key: string
+  label: string
+  vaccines: string[]
+  due_on: string
+  status: 'given' | 'overdue' | 'due' | 'upcoming'
+  given_on: string | null
+  note: string
+}
+
+export interface VaccinationView {
+  member_id: string
+  name: string
+  birth_date: string | null
+  eligible: boolean
+  reason: 'no_birth_date' | 'too_old' | null
+  schedule_name: string
+  disclaimer: string
+  items: VaccineItem[]
+}
+
+export interface DoctorNote {
+  text: string
+  source: 'assistant' | 'basic'
+}
+
+export interface MedicineReminder {
+  series: string
+  label: string
+  times: string[]
+  ends_on: string | null
+  next_due: string | null
+}
+
+export interface MedicineReminderBody {
+  label: string
+  times: string[]
+  days: number
+}
+
+export type ReplyRating = 'up' | 'down'
+export type ReplyReason = 'wrong_info' | 'unsafe' | 'misunderstood' | 'not_helpful' | 'other'
+
+export interface BillingPlan {
+  id: 'monthly' | 'yearly'
+  name: string
+  price_inr: number
+  period: string
+  note: string | null
+}
+
+export interface BillingPlans {
+  enabled: boolean
+  key_id: string | null
+  plans: BillingPlan[]
+  features: string[]
+  free_daily_messages: number
+  free_daily_calls: number
+}
+
+export interface BillingStatus {
+  plan: 'free' | 'plus'
+  status: string | null
+  billing_period: string | null
+  renews_at: string | null
+  cancel_at_cycle_end: boolean
+  messages_today: number
+  messages_limit: number | null
+  calls_today: number
+  calls_limit: number | null
+}
+
+export interface SubscribeResult {
+  subscription_id: string
+  key_id: string
+  plan: string
+}
+
+export interface VerifyBody {
+  razorpay_payment_id: string
+  razorpay_subscription_id: string
+  razorpay_signature: string
+}
+
+export interface PushConfig {
+  available: boolean
+  public_key: string
+  devices: number
+}
+
+export interface PushSubscribeBody {
+  endpoint: string
+  keys: { p256dh: string; auth: string }
+}
 
 export interface EmergencyContact {
   id: string

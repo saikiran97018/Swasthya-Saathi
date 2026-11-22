@@ -15,6 +15,8 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agents.prompts import build_system_prompt
+from app.services.billing import check_call_allowed
+from app.utils.transcript import check_transcript
 from app.api.deps import get_app_settings
 from app.core.config import Settings
 from app.core.errors import AppError, Unauthorized
@@ -63,6 +65,7 @@ async def start_call(
 ) -> CallStartOut:
     svc = _service(request)
     svc._require()
+    await check_call_allowed(session, settings, user)  # free plan: a daily limit (no-op until Razorpay is set up)
     lang = language_for(settings, body.language)
 
     repo = ConversationRepository(session)
@@ -169,7 +172,12 @@ async def llm_for_agent(request: Request) -> StreamingResponse:
 
     async def stream() -> AsyncIterator[str]:
         yield _chunk(first=True)
-        if not text:
+        heard = check_transcript(text) if text else None
+        if heard is not None and heard.ok:
+            text_clean = heard.text
+        else:
+            text_clean = ""  # silence, a filler sound or a recogniser's invented caption: stay quiet instead of answering nobody
+        if not text_clean:
             yield _chunk(finish=True) + "data: [DONE]\n\n"
             return
         try:
@@ -180,14 +188,14 @@ async def llm_for_agent(request: Request) -> StreamingResponse:
                         raise Unauthorized("User no longer exists")
                     pending = await ExecutionRepository(session).pending_logs(cid)
                     if pending:
-                        verdict = await _verdict(text, llm)
+                        verdict = await _verdict(text_clean, llm)
                         if verdict == "other":
                             yield _chunk(lang.confirm_ask)
                             events: AsyncIterator[dict[str, Any]] | None = None
                         else:
                             events = agent.confirm(session, user, tool_execution_id=pending[-1].id, approve=verdict == "yes", voice_output=True)
                     else:
-                        events = agent.handle_message(session, user, conversation_id=cid, text=text, input_mode="voice", language=lang.code, voice_output=True)
+                        events = agent.handle_message(session, user, conversation_id=cid, text=text_clean, input_mode="voice", language=lang.code, voice_output=True)
                     if events is not None:
                         async for ev in events:
                             if ev["type"] == "token":

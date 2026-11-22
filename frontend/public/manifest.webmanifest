@@ -1,0 +1,10 @@
+{
+  "name": "Swasthya Saathi",
+  "short_name": "Saathi",
+  "description": "Your health guide, in your language.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#edf5f3",
+  "theme_color": "#edf5f3",
+  "icons": [{ "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}

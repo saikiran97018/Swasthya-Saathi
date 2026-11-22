@@ -35,18 +35,19 @@ export interface FamilyForm {
   name: string
   relation: FamilyRelation
   birthYear: string
+  birthDate: string // YYYY-MM-DD, optional: a child's exact date of birth starts the vaccination schedule
   gender: FamilyGender | ''
   mobile: string
   language: string
 }
 
-export const EMPTY_FAMILY_FORM: FamilyForm = { name: '', relation: 'child', birthYear: '', gender: '', mobile: '', language: '' }
+export const EMPTY_FAMILY_FORM: FamilyForm = { name: '', relation: 'child', birthYear: '', birthDate: '', gender: '', mobile: '', language: '' }
 
 export function formFromMember(m: FamilyMember): FamilyForm {
-  return { name: m.name, relation: m.relation, birthYear: m.birth_year ? String(m.birth_year) : '', gender: m.gender ?? '', mobile: m.mobile ?? '', language: m.language ?? '' }
+  return { name: m.name, relation: m.relation, birthYear: m.birth_year ? String(m.birth_year) : '', birthDate: m.birth_date ?? '', gender: m.gender ?? '', mobile: m.mobile ?? '', language: m.language ?? '' }
 }
 
-export type FamilyField = 'name' | 'birthYear' | 'mobile'
+export type FamilyField = 'name' | 'birthYear' | 'birthDate' | 'mobile'
 
 export function validateFamilyForm(f: FamilyForm, now: Date = new Date()): Partial<Record<FamilyField, string>> {
   const errors: Partial<Record<FamilyField, string>> = {}
@@ -58,6 +59,11 @@ export function validateFamilyForm(f: FamilyForm, now: Date = new Date()): Parti
     const max = now.getFullYear()
     if (!Number.isInteger(y) || y < max - 120 || y > max) errors.birthYear = `Enter a year between ${max - 120} and ${max}.`
   }
+  if (f.birthDate.trim()) {
+    const d = new Date(`${f.birthDate}T00:00:00`)
+    const oldest = new Date(now.getFullYear() - 120, now.getMonth(), now.getDate())
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(f.birthDate) || Number.isNaN(d.getTime()) || d > now || d < oldest) errors.birthDate = 'Enter a real date of birth in the past.'
+  }
   if (f.mobile.trim() && !normalizeMobile(f.mobile)) errors.mobile = 'Enter a 10-digit mobile number starting with 6, 7, 8 or 9, or leave it empty.'
   return errors
 }
@@ -65,7 +71,8 @@ export function validateFamilyForm(f: FamilyForm, now: Date = new Date()): Parti
 /** Body for POST /family. Optional fields that are empty are left out. */
 export function familyCreateBody(f: FamilyForm): FamilyMemberBody {
   const body: FamilyMemberBody = { name: f.name.trim(), relation: f.relation }
-  if (f.birthYear.trim()) body.birth_year = Number(f.birthYear.trim())
+  if (f.birthDate.trim()) body.birth_date = f.birthDate.trim()
+  else if (f.birthYear.trim()) body.birth_year = Number(f.birthYear.trim())
   if (f.gender) body.gender = f.gender
   const mobile = f.mobile.trim() ? normalizeMobile(f.mobile) : null
   if (mobile) body.mobile = mobile
@@ -79,6 +86,7 @@ export function familyPatchBody(f: FamilyForm): Partial<FamilyMemberBody> {
     name: f.name.trim(),
     relation: f.relation,
     birth_year: f.birthYear.trim() ? Number(f.birthYear.trim()) : null,
+    birth_date: f.birthDate.trim() || null,
     gender: f.gender || null,
     mobile: f.mobile.trim() ? normalizeMobile(f.mobile) : null,
     language: f.language || null,

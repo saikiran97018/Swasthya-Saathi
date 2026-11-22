@@ -1,5 +1,6 @@
 import { memo, useState } from 'react'
 import { Check, Copy, Mic, Pause, Play, RotateCw, Square, TriangleAlert, Volume2, Wrench } from 'lucide-react'
+import { ReplyRating } from '@/components/chat/ReplyRating'
 import type { ToolExecution, UiMessage } from '@/api/types'
 import { LogoMark } from '@/components/layout/Brand'
 import { Badge, IconButton } from '@/components/ui/primitives'
@@ -122,6 +123,7 @@ export const MessageBubble = memo(function MessageBubble(p: Props) {
                   <RotateCw className="size-4" />
                 </IconButton>
               )}
+              {!p.turnRunning && <ReplyRating messageId={m.id} />}
             </div>
             <SourceBadge message={m} />
             <span className="flex items-center gap-1.5 text-xs text-muted">

@@ -4,7 +4,7 @@ import { EMPTY_FAMILY_FORM, ageFromBirthYear, bookingFieldsFor, familyCreateBody
 
 const now = new Date('2026-11-21T10:00:00Z')
 
-const asha: FamilyMember = { id: 'f1', name: 'Asha Kumar', relation: 'child', birth_year: 2019, gender: 'female', mobile: '9876543210', language: 'te', created_at: '2026-01-01T00:00:00Z' }
+const asha: FamilyMember = { id: 'f1', name: 'Asha Kumar', relation: 'child', birth_year: 2019, birth_date: null, gender: 'female', mobile: '9876543210', language: 'te', created_at: '2026-01-01T00:00:00Z' }
 
 describe('age', () => {
   it('is computed from the birth year', () => {
@@ -39,7 +39,7 @@ describe('validation', () => {
 describe('request bodies', () => {
   it('create leaves empty optional fields out', () => {
     expect(familyCreateBody({ ...EMPTY_FAMILY_FORM, name: ' Asha ' })).toEqual({ name: 'Asha', relation: 'child' })
-    expect(familyCreateBody({ name: 'Asha', relation: 'child', birthYear: '2019', gender: 'female', mobile: '98765 43210', language: 'te' })).toEqual({
+    expect(familyCreateBody({ name: 'Asha', relation: 'child', birthYear: '2019', birthDate: '', gender: 'female', mobile: '98765 43210', language: 'te' })).toEqual({
       name: 'Asha',
       relation: 'child',
       birth_year: 2019,
@@ -50,11 +50,27 @@ describe('request bodies', () => {
   })
 
   it('patch sends null to clear a field', () => {
-    expect(familyPatchBody({ ...EMPTY_FAMILY_FORM, name: 'Asha', relation: 'sibling' })).toEqual({ name: 'Asha', relation: 'sibling', birth_year: null, gender: null, mobile: null, language: null })
+    expect(familyPatchBody({ ...EMPTY_FAMILY_FORM, name: 'Asha', relation: 'sibling' })).toEqual({ name: 'Asha', relation: 'sibling', birth_year: null, birth_date: null, gender: null, mobile: null, language: null })
   })
 
   it('round-trips a member through the form', () => {
     expect(familyCreateBody(formFromMember(asha))).toEqual({ name: 'Asha Kumar', relation: 'child', birth_year: 2019, gender: 'female', mobile: '9876543210', language: 'te' })
+  })
+})
+
+describe('date of birth', () => {
+  it('a date of birth wins over a birth year in the body', () => {
+    expect(familyCreateBody({ ...EMPTY_FAMILY_FORM, name: 'Aarav', birthYear: '2026', birthDate: '2026-01-10' })).toEqual({ name: 'Aarav', relation: 'child', birth_date: '2026-01-10' })
+    expect(familyPatchBody({ ...EMPTY_FAMILY_FORM, name: 'Aarav', birthDate: '2026-01-10' }).birth_date).toBe('2026-01-10')
+  })
+  it('is checked: a real date, in the past, not older than 120 years', () => {
+    expect(validateFamilyForm({ ...EMPTY_FAMILY_FORM, name: 'Aarav', birthDate: '2026-01-10' }, now).birthDate).toBeUndefined()
+    expect(validateFamilyForm({ ...EMPTY_FAMILY_FORM, name: 'Aarav', birthDate: '2027-01-10' }, now).birthDate).toMatch(/real date/)
+    expect(validateFamilyForm({ ...EMPTY_FAMILY_FORM, name: 'Aarav', birthDate: '1800-01-10' }, now).birthDate).toMatch(/real date/)
+    expect(validateFamilyForm({ ...EMPTY_FAMILY_FORM, name: 'Aarav', birthDate: '2026-13-45' }, now).birthDate).toMatch(/real date/)
+  })
+  it('comes back into the form from a saved member', () => {
+    expect(formFromMember({ ...asha, birth_date: '2019-03-04' }).birthDate).toBe('2019-03-04')
   })
 })
 

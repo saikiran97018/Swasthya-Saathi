@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { CalendarClock, CalendarX, CheckCheck, MapPin, Phone, Video, BellRing, FlaskConical } from 'lucide-react'
+import { CalendarClock, CalendarX, CheckCheck, MapPin, Phone, Share2, Video, BellRing, FlaskConical } from 'lucide-react'
+import { shareAppointment } from '@/lib/share'
 import { useCancelAppointment, useDemoAppointmentAction, useHealth } from '@/api/hooks'
 import type { Appointment } from '@/api/types'
 import { Badge, Button, Dialog } from '@/components/ui/primitives'
@@ -143,6 +144,11 @@ export function AppointmentCard({ appointment: a }: { appointment: Appointment }
       )}
 
       <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-line pt-4">
+        {a.status !== 'cancelled' && (
+          <Button size="sm" variant="secondary" onClick={() => void shareAppointment(a)}>
+            <Share2 className="size-4" aria-hidden /> Share
+          </Button>
+        )}
         {booked && (
           <>
             <Button size="sm" variant="secondary" onClick={() => openWithDraft(a.conversation_id, appointmentPrompts.reschedule(a.ref))}>

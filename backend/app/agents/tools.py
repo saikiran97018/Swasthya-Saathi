@@ -31,6 +31,8 @@ from app.core.errors import AppError
 from app.database.models import Conversation, User
 from app.database.repositories.family import FamilyRepository
 from app.database.repositories.knowledge import DirectoryRepository, KnowledgeRepository
+from app.services.checkin import schedule_checkin
+from app.services.medicine import MedicineError, MedicineService
 from app.database.repositories.providers import ProviderRepository
 from app.database.repositories.tasks import TaskRepository
 from app.services import scheduling as sched
@@ -171,6 +173,7 @@ class AssessUrgency(Tool):
 
     async def run(self, ctx: ToolContext, args: UrgencyArgs) -> ToolResult:
         out = triage.assess(args.symptoms, args.age, args.pregnant)
+        await schedule_checkin(ctx.session, ctx.user, ctx.conversation, symptoms=args.symptoms, urgency=out["urgency"], language=ctx.conversation.language or "en")  # asks how they are tomorrow
         return ToolResult(out, f"Urgency: {out['urgency']}; suggested specialty: {out['suggested_specialty']}")
 
 
@@ -193,6 +196,70 @@ class SearchKnowledgeBase(Tool):
             return ToolResult({"results": [], "note": "No matching knowledge base entries."}, "No knowledge base matches")
         results = [{"title": h.title, "category": h.category, "text": h.text, "source": h.source_url} for h in hits]
         return ToolResult({"results": results}, f"Found {len(results)} knowledge base entr{'y' if len(results) == 1 else 'ies'}: {hits[0].title}")
+
+
+class MedicalShopsArgs(BaseModel):
+    city: str = Field(min_length=2, max_length=80)
+    radius_km: int = Field(default=5, ge=1, le=15)
+    jan_aushadhi_only: bool = Field(default=False, description="Low-cost generics only")
+
+
+class FindMedicalShops(Tool):
+    name = "find_medical_shops"
+    description = "Find medical shops (pharmacies, chemists) near a city or town: name, address, phone, distance, opening hours. Jan Aushadhi Kendras are marked. Details come from OpenStreetMap and can be out of date."
+    params = MedicalShopsArgs
+
+    async def run(self, ctx: ToolContext, args: MedicalShopsArgs) -> ToolResult:
+        if ctx.places is None:
+            raise ToolError("Finding places is not available right now.")
+        try:
+            result, used_km = await ctx.places.search_widening(city=args.city, kind="pharmacy", radius_km=args.radius_km, limit=30)
+            found = result.places
+        except AppError as exc:
+            raise ToolError(exc.message) from exc
+        if args.jan_aushadhi_only:
+            found = [p for p in found if "jan aushadhi" in p.specialties]
+        shops = [
+            {"name": p.name, "address": p.address, "phone": p.phone, "distance_km": p.distance_km, "opening_hours": p.opening_hours, "jan_aushadhi": "jan aushadhi" in p.specialties,
+             "rating": p.rating, "map": p.maps_url or f"https://www.openstreetmap.org/?mlat={p.lat}&mlon={p.lon}#map=18/{p.lat}/{p.lon}"}
+            for p in found[:5]
+        ]
+        wider = f" Nothing was listed within {args.radius_km} km, so these are within {used_km:g} km: say so." if used_km > args.radius_km and shops else ""
+        note = ("Phone and hours may be missing or old. Do not read the map link aloud." + wider) if shops else f"No medical shops are listed within {used_km:g} km of {args.city} on the map. Suggest asking at a nearby larger town or phoning a hospital."
+        return ToolResult({"shops": shops, "note": note}, f"Found {len(shops)} medical shop(s) near {args.city}")
+
+
+class MedicineReminderArgs(BaseModel):
+    action: Literal["set", "list", "stop"]
+    label: str | None = Field(default=None, max_length=60, description="The user's own words, e.g. 'BP tablet'")
+    times: list[str] | None = Field(default=None, max_length=4, description="24-hour IST, e.g. ['08:00']")
+    days: int = Field(default=30, ge=1, le=180)
+
+
+class MedicineReminder(Tool):
+    name = "medicine_reminder"
+    description = (
+        "Daily reminders to take medicine, on the user's phone and in the app. Use when they ask to be reminded to take a tablet or medicine. "
+        "Never suggest a medicine or dose: only use the name and times THEY give. Read the label and times back to them after setting."
+    )
+    params = MedicineReminderArgs
+    category = "write"
+
+    async def run(self, ctx: ToolContext, args: MedicineReminderArgs) -> ToolResult:
+        svc = MedicineService(ctx.session)
+        try:
+            if args.action == "list":
+                items = await svc.list(ctx.user.id)
+                return ToolResult({"reminders": [{"label": i["label"], "times": i["times"], "until": i["ends_on"]} for i in items]}, f"{len(items)} medicine reminder(s)")
+            if args.action == "stop":
+                n = await svc.stop(ctx.user.id, label=args.label)
+                if not n:
+                    raise ToolError("No medicine reminder matches that. Use action list to see them.")
+                return ToolResult({"stopped": args.label}, f"Stopped the reminder for {args.label}")
+            made = await svc.create(ctx.user, label=args.label or "", times=args.times or [], days=args.days, language=ctx.conversation.language or "en")
+        except MedicineError as exc:
+            raise ToolError(exc.message) from exc
+        return ToolResult({"label": made["label"], "times": made["times"], "until": made["ends_on"]}, f"Daily reminder set for {made['label']} at {', '.join(made['times'])}")
 
 
 class DirectoryArgs(BaseModel):
@@ -249,11 +316,11 @@ class WebSearch(Tool):
 
 
 class FindProvidersArgs(BaseModel):
-    specialty: SpecialtyName | None = Field(default=None, description="Kind of doctor; use the suggested_specialty from assess_urgency")
-    city: str | None = Field(default=None, max_length=80, description="City or town, e.g. 'Guntur' or 'Bengaluru'")
-    language: str | None = Field(default=None, description="Language code the doctor should speak, e.g. 'te'")
-    teleconsultation: bool | None = Field(default=None, description="True to only show video/phone consultation options")
-    accepts_ayushman: bool | None = Field(default=None, description="True to only show providers that accept the Ayushman Bharat card")
+    specialty: SpecialtyName | None = Field(default=None, description="Use the suggested_specialty from assess_urgency")
+    city: str | None = Field(default=None, max_length=80)
+    language: str | None = Field(default=None, description="Doctor's language code, e.g. 'te'")
+    teleconsultation: bool | None = Field(default=None, description="Video/phone only")
+    accepts_ayushman: bool | None = Field(default=None, description="Accepts the Ayushman card")
 
 
 class FindHealthcareProviders(Tool):
@@ -366,7 +433,7 @@ class CheckAvailability(Tool):
 
 class BookArgs(BaseModel):
     provider_code: str = Field(min_length=3, max_length=24)
-    slot_start: str = Field(description="Indian time 'YYYY-MM-DD HH:MM': a slot exactly as returned by check_availability, or for a place without online slots the user's chosen time, e.g. '2026-11-23 10:20'")
+    slot_start: str = Field(description="IST 'YYYY-MM-DD HH:MM': a slot from check_availability, else the user's chosen time")
     patient_name: str = Field(min_length=2, max_length=80, description="Full name of the patient")
     patient_mobile: str = Field(min_length=10, max_length=16, description="10-digit Indian mobile number of the patient")
     reason: str = Field(min_length=3, max_length=300, description="Short reason for the visit")
@@ -752,6 +819,8 @@ class SetLanguage(Tool):
 # tool class is for people (Agents screen, docs). The behavioural rules (when to call what, confirmation) live in prompts.py.
 MODEL_DESCRIPTIONS = {
     "assess_urgency": "Rate urgency (emergency/urgent/routine) and suggest a doctor type. Call FIRST for any symptoms. If emergency: tell them to call 112/108 and never book.",
+    "find_medical_shops": "Find medical shops (pharmacies) near a city: phone, hours, distance. Ask the city first.",
+    "medicine_reminder": "Daily medicine reminders (set, list, stop) using only the user's own medicine name and times.",
     "find_healthcare_providers": "Find real hospitals and clinics near a city or town (OpenStreetMap), plus partner clinics with online slots. Returns codes, address, phone, distance. Ask the city first.",
     "check_availability": "Open slots of one provider (IST). For a real place it says there are no online slots. Always call before booking.",
     "book_appointment": "Book a partner slot from check_availability, or save a PLANNED visit (clinic not confirmed) at a real place at the user's chosen time. User confirms first; read the details back.",
@@ -830,6 +899,8 @@ def build_registry() -> ToolRegistry:
         [
             AssessUrgency(),
             FindHealthcareProviders(),
+            FindMedicalShops(),
+            MedicineReminder(),
             CheckAvailability(),
             BookAppointment(),
             ListAppointments(),

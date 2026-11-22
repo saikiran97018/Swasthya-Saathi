@@ -19,7 +19,7 @@ from fastapi.responses import FileResponse, JSONResponse
 
 from app.agents.orchestrator import AgentOrchestrator
 from app.agents.tools import build_registry
-from app.api.routes import agents, agora, appointments, auth, chat, conversations, dashboard, family, health, notifications, places, preferences, providers, sos, tasks, voice
+from app.api.routes import agents, agora, appointments, auth, billing, chat, conversations, dashboard, doctor_note, family, health, medicine, message_feedback, notifications, places, preferences, providers, push, sos, tasks, vaccines, voice
 from app.core.config import Settings, get_settings
 from app.core.errors import AppError, NotFound
 from app.core.logging import install_log_redaction, setup_logging
@@ -35,6 +35,10 @@ from app.services.bhashini_service import BhashiniService
 from app.services.sarvam_service import SarvamService
 from app.services.speech_failover import FailoverSpeechProvider
 from app.services.llm_service import LLMService
+from app.core.security_headers import SecurityHeadersMiddleware
+from app.services.billing import BillingService
+from app.services.push import PushService
+from app.services.rag import RagService
 from app.services.reminder_service import ReminderService
 from app.services.speech_service import SpeechService
 
@@ -51,6 +55,7 @@ def create_app(
     llm_fallback_client: httpx.AsyncClient | None = None,
     places_client: httpx.AsyncClient | None = None,
     agora_client: httpx.AsyncClient | None = None,
+    billing_client: httpx.AsyncClient | None = None,
 ) -> FastAPI:
     settings = settings or get_settings()
     setup_logging(settings.log_level)
@@ -80,7 +85,10 @@ def create_app(
         if backup:  # e.g. Bhashini first, Sarvam if Bhashini fails
             speech_provider = FailoverSpeechProvider(speech_provider, build_speech(backup))
         registry = build_registry()
-        reminders = ReminderService(settings, llm, http)
+        push_service = PushService(settings)
+        app.state.push = push_service
+        app.state.billing = BillingService(settings, billing_client or http)
+        reminders = ReminderService(settings, llm, http, push_service)
         places_service = PlacesService(settings, places_client or http)
         app.state.places = places_service
         app.state.agora = AgoraService(settings, agora_client or http)
@@ -93,7 +101,7 @@ def create_app(
         app.state.speech_provider = speech_provider
         app.state.reminder_service = reminders
         app.state.speech_service = SpeechService(settings, speech_provider)
-        app.state.agent_service = AgentService(settings, llm, AgentOrchestrator(llm, registry, settings, http, places_service))
+        app.state.agent_service = AgentService(settings, llm, AgentOrchestrator(llm, registry, settings, http, places_service, RagService(settings, llm)))
         loop_task = asyncio.create_task(reminders.run_forever()) if settings.reminder_poll_seconds > 0 else None
         log.info(
             "%s started (env=%s, llm=%s%s, speech=%s configured=%s)", settings.app_name, settings.environment, settings.llm_model,
@@ -132,6 +140,7 @@ def create_app(
         trust_proxy=settings.trust_proxy_headers,
     )
     app.add_middleware(RequestContextMiddleware)
+    app.add_middleware(SecurityHeadersMiddleware)
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origin_list,
@@ -159,7 +168,7 @@ def create_app(
         return JSONResponse(status_code=500, content={"error": {"code": "internal_error", "message": "Internal server error", "details": None}})
 
     prefix = settings.api_prefix
-    for module in (health, auth, conversations, chat, voice, agents, appointments, providers, notifications, tasks, preferences, dashboard, family, sos, places, agora):
+    for module in (health, auth, conversations, chat, voice, agents, appointments, providers, notifications, tasks, preferences, dashboard, family, sos, places, agora, push, billing, medicine, message_feedback, vaccines, doctor_note):
         app.include_router(module.router, prefix=prefix)
 
     if settings.static_dir:  # registered last, so every API route and /docs win over the web app's catch-all

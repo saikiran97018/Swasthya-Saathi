@@ -1,4 +1,4 @@
-import { ClipboardList, History, Languages, MessageSquareText, House, Phone, Settings, UserRoundSearch, Users, Activity, type LucideIcon } from 'lucide-react'
+import { ClipboardList, History, Languages, MessageSquareText, House, Phone, Settings, UserRoundSearch, Users, Activity, Pill, Route as RouteIcon, Sparkles, Syringe, type LucideIcon } from 'lucide-react'
 
 export interface NavItem {
   key: string
@@ -25,6 +25,10 @@ export const NAV_ITEMS: NavItem[] = [
   { key: 'careplan', label: 'Care Plan', icon: ClipboardList, to: '/appointments', match: '/appointments', bottom: true, group: 'main', subtitle: 'Care Plan' },
   { key: 'family', label: 'Family', icon: Users, to: '/family', match: '/family', group: 'more', subtitle: 'Family profiles' },
   { key: 'call', label: 'Live call', icon: Phone, to: '/call', match: '/call', group: 'more', subtitle: 'Live voice call' },
+  { key: 'medicines', label: 'Medicines', icon: Pill, to: '/medicines', match: '/medicines', group: 'more', subtitle: 'Medicine reminders' },
+  { key: 'vaccines', label: 'Vaccines', icon: Syringe, to: '/vaccines', match: '/vaccines', group: 'more', subtitle: 'Child vaccination tracker' },
+  { key: 'timeline', label: 'Timeline', icon: RouteIcon, to: '/timeline', match: '/timeline', group: 'more', subtitle: 'Your health timeline' },
+  { key: 'plans', label: 'Saathi Plus', icon: Sparkles, to: '/plans', match: '/plans', group: 'more', subtitle: 'Plans and billing' },
   { key: 'history', label: 'History', icon: History, to: '/history', match: '/history', group: 'more', subtitle: 'Conversation history' },
   { key: 'activity', label: 'Activity', icon: Activity, to: '/activity', match: '/activity', group: 'more', subtitle: 'What your assistant did' },
   { key: 'language', label: 'Language', icon: Languages, to: '/settings/language', match: '/settings/language', group: 'more', subtitle: 'Language settings' },

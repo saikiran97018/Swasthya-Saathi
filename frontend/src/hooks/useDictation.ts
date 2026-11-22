@@ -26,7 +26,7 @@ export function describeSpeechError(err: unknown): string {
   if (err instanceof MicError) return err.message
   if (err instanceof ApiError) {
     if (err.code === 'bhashini_not_configured') return 'Speech recognition is not set up yet. Ask the administrator to add the Bhashini keys, or type your message.'
-    if (err.code === 'no_speech') return "I couldn't hear anything. Please try again a little closer to the microphone."
+    if (err.code === 'no_speech' || err.code === 'unclear_speech') return "I couldn't hear anything. Please try again a little closer to the microphone."
     if (err.status === 413) return 'That recording was too long. Please speak in shorter pieces.'
     return err.message
   }

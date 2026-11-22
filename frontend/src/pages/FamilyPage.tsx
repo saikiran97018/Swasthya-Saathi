@@ -113,7 +113,7 @@ function MemberForm({ member, onDone }: { member: FamilyMember | null; onDone: (
   const { languages } = useLanguage()
   const create = useCreateFamilyMember()
   const update = useUpdateFamilyMember()
-  const ids = { name: useId(), relation: useId(), year: useId(), gender: useId(), mobile: useId(), lang: useId() }
+  const ids = { name: useId(), relation: useId(), year: useId(), dob: useId(), gender: useId(), mobile: useId(), lang: useId() }
   const [form, setForm] = useState<FamilyForm>(member ? formFromMember(member) : EMPTY_FAMILY_FORM)
   const [errors, setErrors] = useState<Partial<Record<FamilyField, string>>>({})
   const [formError, setFormError] = useState<string | null>(null)
@@ -156,6 +156,11 @@ function MemberForm({ member, onDone }: { member: FamilyMember | null; onDone: (
           <label htmlFor={ids.year} className="label-caps mb-1.5 block">Birth year <span className="font-normal normal-case">(optional)</span></label>
           <input id={ids.year} value={form.birthYear} inputMode="numeric" maxLength={4} placeholder="For example 2016" onChange={(e) => set('birthYear', e.target.value.replace(/\D/g, ''))} aria-invalid={!!errors.birthYear} aria-describedby={errors.birthYear ? `${ids.year}-e` : undefined} className={field} />
           {errors.birthYear && <p id={`${ids.year}-e`} role="alert" className="mt-1 text-sm font-medium text-danger">{errors.birthYear}</p>}
+        </div>
+        <div>
+          <label htmlFor={ids.dob} className="label-caps mb-1.5 block">Date of birth <span className="font-normal normal-case">(optional, for a child's vaccine schedule)</span></label>
+          <input id={ids.dob} type="date" value={form.birthDate} max={new Date().toISOString().slice(0, 10)} onChange={(e) => set('birthDate', e.target.value)} aria-invalid={!!errors.birthDate} aria-describedby={errors.birthDate ? `${ids.dob}-e` : undefined} className={field} />
+          {errors.birthDate && <p id={`${ids.dob}-e`} role="alert" className="mt-1 text-sm font-medium text-danger">{errors.birthDate}</p>}
         </div>
         <div>
           <label htmlFor={ids.gender} className="label-caps mb-1.5 block">Gender <span className="font-normal normal-case">(optional)</span></label>

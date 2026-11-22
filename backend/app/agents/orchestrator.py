@@ -14,6 +14,7 @@ nodes if you ever want to move to LangGraph.
 """
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 from collections.abc import AsyncIterator
@@ -21,14 +22,20 @@ from dataclasses import dataclass, field
 from typing import Any
 
 import httpx
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agents.prompts import build_system_prompt
+from app.services import working_memory
+from app.utils.language import language_name
+from app.services.response_validator import REWRITE_NOTE, fallback_text, validate_response
+from app.services.intent import IntentService
+from app.services.rag import RagService
 from app.agents.tools import ToolContext, ToolError, ToolRegistry
 from app.database.repositories.family import FamilyRepository
 from app.services.places import PlacesService
 from app.core.config import Settings
-from app.database.models import AgentExecution, Conversation, ToolExecutionLog, User, utcnow
+from app.database.models import AgentExecution, Conversation, ConversationMetadata, ToolExecutionLog, User, utcnow
 from app.database.repositories.conversations import ConversationRepository
 from app.database.repositories.executions import ExecutionRepository
 from app.schemas.conversation import MessageOut, ToolExecutionOut
@@ -51,6 +58,8 @@ class TurnState:
     input_mode: str = "text"
     tools_used: list[str] = field(default_factory=list)
     awaiting_confirmation: bool = False
+    intent: str = ""
+    context: str = ""  # reference notes + the person's upcoming visits, worked out once per turn
 
 
 def message_event(msg, logs: list[ToolExecutionLog] | None = None) -> dict[str, Any]:
@@ -62,8 +71,10 @@ def tool_event(kind: str, entry: ToolExecutionLog) -> dict[str, Any]:
 
 
 class AgentOrchestrator:
-    def __init__(self, llm: LLMService, registry: ToolRegistry, settings: Settings, http: httpx.AsyncClient, places: PlacesService | None = None):
+    def __init__(self, llm: LLMService, registry: ToolRegistry, settings: Settings, http: httpx.AsyncClient, places: PlacesService | None = None, rag: RagService | None = None):
         self.llm = llm
+        self.rag = rag or RagService(settings, llm)
+        self.intents = IntentService(settings, llm)
         self.registry = registry
         self.s = settings
         self.http = http
@@ -94,7 +105,86 @@ class AgentOrchestrator:
     async def _system_prompt(self, state: TurnState) -> str:
         meta = await ConversationRepository(state.session).get_meta(state.conversation)
         family = [f"{m.name} ({m.relation})" for m in await FamilyRepository(state.session).list(state.user.id)]
-        return build_system_prompt(language=state.language, summary=meta.summary, voice=state.voice, display_name=state.user.display_name, family=family)
+        return build_system_prompt(language=state.language, summary=meta.summary, voice=state.voice, display_name=state.user.display_name, family=family, context=state.context)
+
+    async def _turn_context(self, state: TurnState) -> str:
+        """Retrieval step: verified notes for this question and what the person already has booked. Never blocks the answer."""
+        try:
+            users = [m["content"] for m in await self._history(state) if m["role"] == "user" and m.get("content")]
+            intent = await self.intents.classify(users[-1]) if users else None
+            state.intent = intent.label if intent else ""
+            repo = ConversationRepository(state.session)
+            meta = await repo.get_meta(state.conversation)
+            remembered = working_memory.render((meta.extra or {}).get(working_memory.KEY), await self._earlier_city(state))
+            notes = ""
+            if intent is None or intent.wants_notes:
+                notes = await self.rag.reference_notes(state.session, users, english_query=intent.query if intent and intent.source == "llm" else None)
+            parts = [
+                intent.hint if intent and intent.emergency else "",  # an emergency instruction always comes first
+                await self.rag.person_context(state.session, state.user),
+                remembered,
+                notes,
+                intent.hint if intent and not intent.emergency else "",
+                # last, so it wins over a long history in another language: the person's CURRENT language decides the reply language
+                f"Reply in {language_name(state.language)} in its native script, even if earlier messages used another language.",
+            ]
+            return "\n\n".join(p for p in parts if p)
+        except Exception as exc:  # retrieval is an extra: the assistant still works (and can call search_knowledge_base) without it
+            log.warning("turn context skipped: %s", type(exc).__name__)
+            return ""
+
+    async def _check_reply(self, state: TurnState, messages: list[dict[str, Any]], text: str) -> tuple[str, dict[str, Any] | None]:
+        """Response validation: repair what can be repaired, ask the model for ONE rewrite on a real problem, else use a safe fallback."""
+        if not self.s.response_validation_enabled:
+            return text, None
+        grounding = "\n".join(str(m.get("content") or "") for m in messages if m.get("role") in ("system", "tool", "user"))
+        lang = state.language
+
+        def run(candidate: str):
+            return validate_response(candidate, language=lang, voice=state.voice, intent=state.intent, grounding=grounding)
+
+        verdict = run(text)
+        record: dict[str, Any] = {}
+        if verdict.repairs:
+            record["repairs"] = verdict.repairs
+        if verdict.ok:
+            return verdict.text, record or None
+        record["problems"] = verdict.problems
+        if self.s.response_validation_retry:
+            try:
+                note = REWRITE_NOTE.format(problems=", ".join(verdict.problems), lang=language_name(lang))
+                again = await asyncio.wait_for(self.llm.complete([*messages, {"role": "system", "content": note}], temperature=0.2, max_tokens=400), timeout=20)
+                second = run(again or "")
+                if second.ok:
+                    record["action"] = "rewritten"
+                    record["repairs"] = sorted(set(record.get("repairs", [])) | set(second.repairs))
+                    return second.text, record
+            except Exception as exc:
+                log.info("reply rewrite skipped: %s", type(exc).__name__)
+        record["action"] = "fallback"
+        log.warning("reply replaced by the safe fallback: %s", ",".join(verdict.problems))
+        return fallback_text(lang, state.intent), record
+
+    async def _earlier_city(self, state: TurnState) -> str | None:
+        """The city this person searched in during an earlier chat, offered as a default (to be confirmed)."""
+        if (await ConversationRepository(state.session).get_meta(state.conversation)).extra.get(working_memory.KEY, {}).get("city"):
+            return None  # this chat already has one
+        rows = await state.session.execute(
+            select(ConversationMetadata.extra).join(Conversation, ConversationMetadata.conversation_id == Conversation.id)
+            .where(Conversation.user_id == state.user.id, Conversation.id != state.conversation.id).order_by(Conversation.last_message_at.desc()).limit(5)
+        )
+        for (extra,) in rows.all():
+            city = ((extra or {}).get(working_memory.KEY) or {}).get("city")
+            if city:
+                return city
+        return None
+
+    async def _remember(self, state: TurnState, tool: str, args: dict[str, Any], data: dict[str, Any]) -> None:
+        """Fold a successful tool result into the conversation's working memory (no model call)."""
+        meta = await ConversationRepository(state.session).get_meta(state.conversation)
+        extra = dict(meta.extra or {})
+        extra[working_memory.KEY] = working_memory.update(extra.get(working_memory.KEY), tool, args, data)
+        meta.extra = extra  # a new dict, so the JSON column is saved
 
     def _tool_ctx(self, state: TurnState) -> ToolContext:
         return ToolContext(session=state.session, user=state.user, conversation=state.conversation, settings=self.s, http=self.http, places=self.places)
@@ -103,6 +193,7 @@ class AgentOrchestrator:
     async def run(self, state: TurnState) -> AsyncIterator[dict[str, Any]]:
         repo = ConversationRepository(state.session)
         tools_spec = self.registry.specs(self.s)
+        state.context = await self._turn_context(state)
 
         for _ in range(self.s.agent_max_steps):
             state.execution.steps += 1
@@ -115,10 +206,14 @@ class AgentOrchestrator:
             calls = []
             usage = None
             used_model = self.llm.model
+            # Spoken replies are held back until they pass the response check (nothing invented may reach the speaker);
+            # typed replies stream live and the final message carries the checked text.
+            hold = state.voice and self.s.response_validation_enabled
             async for chunk in self.llm.stream_chat(messages, tools_spec):
                 if chunk.content:
                     text_parts.append(chunk.content)
-                    yield {"type": "token", "delta": chunk.content}
+                    if not hold:
+                        yield {"type": "token", "delta": chunk.content}
                 if chunk.finished:
                     calls, usage = chunk.tool_calls, chunk.usage
                     used_model = chunk.model or used_model  # may be the fallback model after a failover
@@ -127,19 +222,24 @@ class AgentOrchestrator:
 
             # ---- final answer ------------------------------------------------------------
             if not calls:
+                checked, validation = await self._check_reply(state, messages, text)
+                if hold:
+                    yield {"type": "token", "delta": checked}
                 final = await repo.add_message(
                     state.conversation,
                     role="assistant",
-                    content=text or FALLBACK_REPLY,
+                    content=checked or FALLBACK_REPLY,
                     language=state.language,
                     input_mode=state.input_mode,
-                    meta={"tools_used": list(dict.fromkeys(state.tools_used)), "model": used_model, "usage": usage},
+                    meta={"tools_used": list(dict.fromkeys(state.tools_used)), "model": used_model, "usage": usage, "intent": state.intent, **({"validation": validation} if validation else {})},
                 )
                 state.execution.assistant_message_id = final.id
                 yield message_event(final)
                 return
 
             # ---- the model asked for tools -----------------------------------------------
+            if hold and text:
+                yield {"type": "token", "delta": text}  # the short lead-in ("one moment") before a tool runs
             assistant = await repo.add_message(
                 state.conversation,
                 role="assistant",
@@ -251,6 +351,7 @@ class AgentOrchestrator:
         self._apply_outcome(entry, outcome)
         if outcome.status == "success":
             state.tools_used.append(tool.name)
+            await self._remember(state, tool.name, arguments, outcome.data)
         await self._tool_message(repo, state, call.id, tool.name, outcome.data)
         yield tool_event("tool_result", entry)
         if ctx.language_changed_to:
@@ -298,6 +399,7 @@ class AgentOrchestrator:
         self._apply_outcome(entry, outcome)
         if outcome.status == "success":
             state.tools_used.append(tool.name)
+            await self._remember(state, tool.name, dict(entry.arguments or {}), outcome.data)
         await self._tool_message(repo, state, entry.tool_call_id, entry.tool_name, outcome.data)
         yield tool_event("tool_result", entry)
 

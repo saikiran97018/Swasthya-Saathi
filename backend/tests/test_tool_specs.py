@@ -55,5 +55,5 @@ def test_every_tool_has_a_short_model_description():
 def test_request_overhead_stays_small():
     tools_chars = len(json.dumps(list(specs().values())))
     prompt_chars = len(build_system_prompt(language="te", summary=None, voice=False, display_name=None))
-    assert tools_chars < 9000, tools_chars  # was 11.5k before slimming
+    assert tools_chars < 9500, tools_chars  # was 11.5k before slimming; 9.0k before the medicine-shop and medicine-reminder tools
     assert prompt_chars < 4000, prompt_chars  # was 4.4k before slimming

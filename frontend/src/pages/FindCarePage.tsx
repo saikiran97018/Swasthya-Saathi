@@ -26,6 +26,7 @@ const KINDS: { value: PlaceFilters['kind']; label: string }[] = [
   { value: 'hospital', label: 'Hospitals' },
   { value: 'clinic', label: 'Clinics' },
   { value: 'doctor', label: 'Doctors' },
+  { value: 'pharmacy', label: 'Medical shops' },
 ]
 
 /** A friendly sentence for each way the place search can fail. */
@@ -85,7 +86,7 @@ export default function FindCarePage() {
     <div className="mx-auto w-full max-w-4xl px-4 py-5 md:px-8 md:py-8">
       <header className="mb-5">
         <h1 className="text-[1.65rem] leading-tight font-bold tracking-tight md:text-3xl">Find a doctor</h1>
-        <p className="mt-1.5 text-muted">Real hospitals, clinics and doctors near you, from OpenStreetMap. Call, get directions, or plan a visit.</p>
+        <p className="mt-1.5 text-muted">Real hospitals, clinics and doctors near you. Call, get directions, or plan a visit.</p>
       </header>
 
       <section aria-label="Search" className="card mb-4 space-y-3 p-4">
@@ -176,7 +177,7 @@ export default function FindCarePage() {
 
       {query && !isLoading && !isError && (
         <p className="mt-4 px-1 text-xs leading-relaxed text-muted">
-          {data?.attribution || 'Map data © OpenStreetMap contributors'}. Phone numbers and opening hours are added by volunteers and may be out of date: call before you go.
+          {data?.attribution?.includes('Google') ? `${data.attribution}. ` : ''}Phone numbers and opening hours may be out of date: call before you go.
         </p>
       )}
     </div>

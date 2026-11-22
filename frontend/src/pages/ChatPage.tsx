@@ -1,7 +1,8 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { Phone, Stethoscope } from 'lucide-react'
+import { FileText, Phone, Stethoscope } from 'lucide-react'
 import { Composer } from '@/components/chat/Composer'
+import { DoctorNoteDialog } from '@/components/chat/DoctorNoteDialog'
 import { SuggestedPrompts } from '@/components/chat/SuggestedPrompts'
 import { ThreadView } from '@/components/chat/ThreadView'
 import { Badge } from '@/components/ui/primitives'
@@ -17,6 +18,7 @@ export default function ChatPage() {
   const location = useLocation()
   const navigate = useNavigate()
   const { state } = chat
+  const [noteOpen, setNoteOpen] = useState(false)
 
   // A prompt handed over from the dashboard ("Check my symptoms"): send it once.
   const handled = useRef<string | null>(null)
@@ -39,10 +41,17 @@ export default function ChatPage() {
           <h1 className="truncate text-[15px] font-semibold">{state.conversation?.title ?? 'New conversation'}</h1>
         </div>
         {lang && <Badge tone="accent">{languageLabel(lang, languages)}</Badge>}
+        {state.conversationId && state.messages.some((m) => m.role === 'user') && (
+          <button type="button" onClick={() => setNoteOpen(true)} className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-soft px-3 text-sm font-medium text-muted transition hover:text-fg" aria-label="Make a note for your doctor">
+            <FileText className="size-4" aria-hidden /> Doctor note
+          </button>
+        )}
         <Link to="/call" className="inline-flex h-9 items-center gap-1.5 rounded-xl bg-soft px-3 text-sm font-medium text-muted transition hover:text-fg" aria-label="Start a live voice call">
           <Phone className="size-4" aria-hidden /> Live call
         </Link>
       </div>
+
+      <DoctorNoteDialog conversationId={state.conversationId} open={noteOpen} onClose={() => setNoteOpen(false)} />
 
       <ThreadView>
         <div className="flex flex-col items-center pt-6 text-center md:pt-14">

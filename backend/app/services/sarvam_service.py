@@ -56,7 +56,9 @@ class SarvamService:
         code = _STT_CODES.get(language)
         if code is None:
             raise UpstreamError(f"Sarvam has no speech recognition for '{language}'", code="sarvam_no_model")
-        data = {"model": self.s.sarvam_stt_model, "mode": self.s.sarvam_stt_mode, "language_code": code}
+        data = {"model": self.s.sarvam_stt_model, "mode": self.s.sarvam_stt_mode}
+        if not self.s.sarvam_stt_autodetect:  # without a language code Sarvam detects the language itself
+            data["language_code"] = code
         files = {"file": ("speech.wav", wav_bytes, "audio/wav")}
         body = await self._post(self.s.sarvam_stt_url, what="speech recognition", data=data, files=files)
         try:

@@ -53,7 +53,12 @@ class Settings(BaseSettings):
     sarvam_api_key: str = ""
     sarvam_stt_url: str = "https://api.sarvam.ai/speech-to-text"
     sarvam_stt_model: str = "saaras:v4"
-    sarvam_stt_mode: str = "transcribe"  # transcribe | codemix | verbatim ...
+    # codemix keeps English words (a city, "doctor", a medicine name) in English letters, which is how people speak and what the
+    # assistant and the map search understand best. transcribe | codemix | verbatim ...
+    sarvam_stt_mode: str = "codemix"
+    # True: Sarvam recognises the language itself, so someone who speaks Hindi while Telugu is selected is still understood.
+    # False: always listen for the selected language only.
+    sarvam_stt_autodetect: bool = True
     sarvam_tts_url: str = "https://api.sarvam.ai/text-to-speech"
     sarvam_tts_model: str = "bulbul:v3"
     sarvam_tts_speaker_female: str = "priya"  # speakers are model-specific; these two belong to bulbul:v3
@@ -101,6 +106,44 @@ class Settings(BaseSettings):
     planned_visit_min_lead_minutes: int = 120
     planned_visit_horizon_days: int = 60
 
+    # --- Saathi Plus subscription (Razorpay). Off until the key pair and the monthly plan id are set. Use TEST keys until you go live ---
+    razorpay_key_id: str = ""  # rzp_test_... / rzp_live_... (the id is public: the browser needs it)
+    razorpay_key_secret: str = ""
+    razorpay_webhook_secret: str = ""  # the secret you type when adding the webhook in the Razorpay dashboard
+    razorpay_plan_monthly: str = ""  # plan_... created in the dashboard (or with scripts/create_razorpay_plans.py)
+    razorpay_plan_yearly: str = ""  # optional
+    plan_monthly_inr: int = 99  # shown on the Plans page only; the amount charged is the one on the Razorpay plan
+    plan_yearly_inr: int = 999
+    free_daily_messages: int = 25  # free plan: assistant messages per day (0 = no limit). SOS and emergency numbers are never limited
+    free_daily_calls: int = 2  # free plan: live voice calls per day (0 = no limit)
+
+    # --- intent classification: rules first, one short model call for other scripts or unclear messages ---
+    intent_llm_enabled: bool = True
+    intent_timeout_seconds: float = 6.0
+
+    # --- response validation: replies are checked (facts, safety, language) before they are spoken or shown ---
+    response_validation_enabled: bool = True
+    response_validation_retry: bool = True  # on a real problem, ask the model for one rewrite before using the safe fallback
+
+    # --- retrieval (RAG): matching knowledge-base notes are handed to the model on every turn ---
+    rag_enabled: bool = True
+    rag_top_k: int = 2
+    rag_min_score: float = 0.55  # below this a passage is treated as unrelated (tuned on the seeded knowledge base)
+    rag_chunk_chars: int = 600
+    rag_translate_timeout_seconds: float = 6.0
+
+    # --- phone / browser push notifications (Web Push). On by default; the signing key is derived from JWT_SECRET unless you set one ---
+    push_enabled: bool = True
+    vapid_private_key: str = ""  # optional: base64url P-256 private key (see scripts/make_vapid_keys.py); blank = derive from jwt_secret
+    vapid_subject: str = "mailto:admin@swasthya-saathi.example"  # contact for the push services; set to a real address in production
+
+    # --- SMS reminders (Twilio). Off until all three are set; each person must also switch it on in Settings (opt-in) ------
+    twilio_account_sid: str = ""
+    twilio_auth_token: str = ""
+    sms_from: str = ""  # your Twilio phone number in international form, e.g. +15551234567 (or a Messaging Service id starting MG)
+    sms_country_code: str = "+91"  # added to 10-digit Indian mobile numbers
+    sms_max_chars: int = 300  # longer reminders are shortened (Indian-language text costs more per message part)
+
     # --- live voice calls: Agora Conversational AI (real-time voice agent) + Murf Falcon (text to speech) ------
     agora_app_id: str = ""
     agora_app_certificate: str = ""  # used to sign tokens; with it no Customer ID / Secret is needed
@@ -122,6 +165,11 @@ class Settings(BaseSettings):
 
     # --- real places (OpenStreetMap: Nominatim to find a city, Overpass to list hospitals and clinics) ------
     places_enabled: bool = True
+    # Google Maps (Places API, new): the better source for clinics and medical shops. Used first when a key is set, with OpenStreetMap as the
+    # automatic backup. The key needs "Places API (New)" enabled in Google Cloud. places_provider: auto (Google if a key is set) | google | osm
+    google_maps_api_key: str = ""
+    places_provider: str = "auto"
+    google_places_url: str = "https://places.googleapis.com/v1"
     nominatim_url: str = "https://nominatim.openstreetmap.org/search"
     # Nominatim is the main source (fast and reliable). Overpass is OPTIONAL and more complete for big cities; the public
     # servers are often overloaded, so it is off unless you set a URL, e.g. https://overpass-api.de/api/interpreter
@@ -187,6 +235,18 @@ class Settings(BaseSettings):
         if self.agora_public_url and not self.agora_public_url.startswith("https://"):
             raise ValueError("AGORA_PUBLIC_URL must start with https:// (Agora only calls HTTPS endpoints)")
         return self
+
+    @property
+    def google_places_active(self) -> bool:
+        return bool(self.google_maps_api_key) and self.places_provider in ("auto", "google")
+
+    @property
+    def billing_enabled(self) -> bool:
+        return bool(self.razorpay_key_id and self.razorpay_key_secret and self.razorpay_plan_monthly)
+
+    @property
+    def sms_configured(self) -> bool:
+        return bool(self.twilio_account_sid and self.twilio_auth_token and self.sms_from)
 
     @property
     def agora_configured(self) -> bool:

@@ -51,7 +51,7 @@ def test_search_by_city_returns_real_places_nearest_first():
         r = c.get(f"{P}/places/search", params={"city": "Guntur"}, headers=h)
         assert r.status_code == 200, r.text
         body = r.json()
-        assert body["attribution"] == "Map data © OpenStreetMap contributors" and "OpenStreetMap" in body["note"]
+        assert body["attribution"] == "Map data © OpenStreetMap contributors" and "OpenStreetMap" not in body["note"]
         assert body["center"]["label"].startswith("Guntur")
         names = [p["name"] for p in body["items"]]
         assert "Guntur General Hospital" in names and len(names) == 4  # the unnamed pin is skipped

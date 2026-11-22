@@ -454,13 +454,14 @@ def test_llm_not_configured_gives_actionable_503(make_client):
     assert c.get(f"{P}/health", headers=h).json()["llm_configured"] is False
 
 
-def test_empty_model_reply_gets_fallback_text(client, auth, llm, monkeypatch):
+def test_empty_model_reply_gets_fallback_text(make_client, llm, monkeypatch):
     async def instant(_):
         return None
 
     monkeypatch.setattr("app.services.llm_service.asyncio.sleep", instant)
+    c = make_client(response_validation_enabled=False)  # with the response check on, an empty reply gets a rewrite or a safe fallback (test_response_validation.py)
     llm.script = [{"content": ""}] * 3  # an empty answer is retried before the user sees the apology
-    assert "could not come up with an answer" in say(client, auth, "hi").json()["assistant_message"]["content"]
+    assert "could not come up with an answer" in say(c, login_guest(c), "hi").json()["assistant_message"]["content"]
 
 
 # ------------------------------------------------------------------ websocket streaming

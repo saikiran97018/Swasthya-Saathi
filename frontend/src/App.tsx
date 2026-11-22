@@ -17,6 +17,11 @@ const SettingsPage = lazy(() => import('@/pages/SettingsPage'))
 const LanguageSettingsPage = lazy(() => import('@/pages/LanguageSettingsPage'))
 const SosPage = lazy(() => import('@/pages/SosPage'))
 const FamilyPage = lazy(() => import('@/pages/FamilyPage'))
+const PlansPage = lazy(() => import('@/pages/PlansPage'))
+const LegalPage = lazy(() => import('@/pages/LegalPage'))
+const MedicinesPage = lazy(() => import('@/pages/MedicinesPage'))
+const TimelinePage = lazy(() => import('@/pages/TimelinePage'))
+const VaccinesPage = lazy(() => import('@/pages/VaccinesPage'))
 
 function PageFallback() {
   return (
@@ -47,6 +52,11 @@ export default function App() {
           <Route path="/activity" element={<ActivityPage />} />
           <Route path="/sos" element={<SosPage />} />
           <Route path="/family" element={<FamilyPage />} />
+          <Route path="/plans" element={<PlansPage />} />
+          <Route path="/medicines" element={<MedicinesPage />} />
+          <Route path="/timeline" element={<TimelinePage />} />
+          <Route path="/vaccines" element={<VaccinesPage />} />
+          <Route path="/legal/:doc" element={<LegalPage />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/settings/language" element={<LanguageSettingsPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />

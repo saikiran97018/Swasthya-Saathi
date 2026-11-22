@@ -16,6 +16,8 @@ export function notificationPrefill(n: Pick<AppNotification, 'kind' | 'appointme
   const ref = n.appointment_ref
   if (n.kind === 'feedback_request') return ref ? `Feedback for my appointment ${ref}: ` : 'Feedback for my appointment: '
   if (n.kind === 'follow_up') return ref ? `I'd like to book my follow-up visit for appointment ${ref}` : "I'd like to book my follow-up visit"
+  if (n.kind === 'symptom_checkin') return 'Update on how I am feeling: '
+  if (n.kind === 'vaccine') return 'I want to plan a visit for the vaccines that are due'
   return null // reminders just open the conversation
 }
 

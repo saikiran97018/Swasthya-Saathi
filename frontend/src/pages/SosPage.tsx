@@ -179,7 +179,7 @@ export default function SosPage() {
                   )
                 })}
               </ul>
-              {hasOsm && <p className="mt-3 text-xs text-muted">Map data © OpenStreetMap contributors. Phone numbers and hours come from volunteers and may be out of date.</p>}
+              {hasOsm && <p className="mt-3 text-xs text-muted">Phone numbers and hours may be out of date: call before you go.</p>}
             </>
           )}
         </div>

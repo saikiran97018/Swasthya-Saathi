@@ -57,7 +57,7 @@ Real screens from the running app. *These were captured in a test run where a sc
 
 | Area | Status |
 |---|---|
-| Backend logic and all API routes | **365 automated tests**: 364 pass on SQLite (one needs PostgreSQL row locks and is skipped there), and all 365 pass on a real PostgreSQL 17 database; the migrations ran on the real database. Frontend: 191 tests, type check and build clean |
+| Backend logic and all API routes | **647 automated tests**: 646 pass on SQLite (one needs PostgreSQL row locks and is skipped there), the full suite last ran on a real PostgreSQL 17 database before the SMS and phone-notification additions, and all migrations (to 0006) have been applied to it. Frontend: 222 tests, type check and build clean |
 | Database schema | Alembic migration applied to PostgreSQL; model-vs-schema drift check is clean |
 | Double-booking protection, confirmation gate, reminders, failover | Covered by tests (including two users racing for one slot) |
 | Frontend | 79 unit tests, strict type-check and production build pass |
@@ -129,6 +129,15 @@ Open <http://localhost:5173>. The dev server proxies `/api` (including the WebSo
 | `LLM_API_KEY` | Your Groq key (console.groq.com). Defaults: `LLM_BASE_URL=https://api.groq.com/openai/v1`, `LLM_MODEL=openai/gpt-oss-120b` |
 | `LLM_FALLBACK_BASE_URL`, `LLM_FALLBACK_API_KEY`, `LLM_FALLBACK_MODEL` | `https://api.sarvam.ai/v1`, your Sarvam key, `sarvam-105b-conversations`: used automatically when Groq is rate-limited, down or rejects the key |
 | `BHASHINI_USER_ID`, `BHASHINI_ULCA_API_KEY` | Bhashini speech. Use it as the main provider (`SPEECH_PROVIDER=bhashini`) or as the backup for Sarvam; with both keys set, whichever is not the main one backs it up |
+| `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET`, `RAZORPAY_PLAN_MONTHLY` (+ `RAZORPAY_PLAN_YEARLY`) | Optional **Saathi Plus** subscription via Razorpay. Blank = the app stays free and unlimited. With them set the free plan gets daily limits (`FREE_DAILY_MESSAGES`=25, `FREE_DAILY_CALLS`=2) and Plus removes them; SOS and reminders are never limited. Use `rzp_test_` keys first. Create plans with `scripts\create_razorpay_plans.py`, then add the webhook `https://YOUR-HOST/api/v1/billing/webhook` (events: `subscription.activated, charged, pending, halted, cancelled, completed, paused, resumed`) using the same secret as `RAZORPAY_WEBHOOK_SECRET`. Card and UPI details go only to Razorpay |
+| *(no setting)* | **Medical shops** (Find care, "Medical shops" chip, and "find a medical shop near me" by voice), **daily medicine reminders** (Medicines page, or say "remind me to take my BP tablet at 8"; they also pop up on the phone), **thumbs up/down on replies** (review the bad ones with `scripts\export_flagged_answers.py`), **Share** on an appointment (the phone's share sheet or WhatsApp; the patient's mobile number is never included) and a **Health timeline** of all visits per family member |
+| `GOOGLE_MAPS_API_KEY`, `PLACES_PROVIDER` | Optional **Google Maps** (Places API, new) as the first source for hospitals, clinics and medical shops; ratings and Google Maps links are shown. Any Google failure falls back to OpenStreetMap automatically. Needs "Places API (New)" enabled and billing on in Google Cloud. Blank = OpenStreetMap only |
+| *(no setting)* | **Symptom check-in** (the day after Saathi rates your symptoms, a notification asks how you are now; one at a time, none for emergencies, switch off in Settings → Reminders), **child vaccine tracker** (Vaccines page: India's UIP schedule from the child's date of birth, tick visits, reminders before each, the assistant knows what is due) and a **Doctor note** button in the chat (a plain-language note for the clinic from your own words; the assistant never adds facts, diagnosis or doses) |
+| `RESPONSE_VALIDATION_ENABLED`, `RESPONSE_VALIDATION_RETRY` | **Response validation** before a reply is spoken or shown: invented phone numbers, fees and references, medicine doses, diagnoses, leaked instructions and the wrong language are caught; one rewrite, else a safe localized fallback. Spoken replies are held back until checked. On by default. See `docs/VOICE_PIPELINE.md` |
+| `INTENT_LLM_ENABLED`, `INTENT_TIMEOUT_SECONDS` | **Intent classification**: fast rules (English, Hinglish, main Indian-language emergency words) decide what the person wants; one short model call handles other scripts or unclear messages and also returns the knowledge-base query. A possible emergency puts a "call 112 first" instruction at the top of the prompt, in code. On by default |
+| `RAG_ENABLED`, `RAG_MIN_SCORE`, `RAG_TOP_K` | **Retrieval**: the best-matching verified notes (and the person's upcoming visits) are given to the model on every turn, so health and scheme answers come from the knowledge base. On by default |
+| `PUSH_ENABLED`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | **Phone notifications** (Web Push) are on by default and need no keys: the signing key is derived from `JWT_SECRET`, so keep that stable. Optional: `VAPID_SUBJECT` = a real `mailto:` contact. Each phone opts in under Settings → Reminders |
+| `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `SMS_FROM` | Optional **SMS reminders** via Twilio (`SMS_FROM` = your Twilio number or a `MG…` Messaging Service id). Each person still opts in under Settings → Reminders; texts go only to the mobile number given for that visit, once per reminder, and a failed text never blocks the in-app reminder |
 | `WEBHOOK_URL` / `WEBHOOK_SECRET` | Optional: your hospital system / SMS gateway |
 | `DEMO_MODE` | `true` only to show the "simulate visit / remind now" demo buttons; default `false` |
 | `AGORA_APP_ID`, `AGORA_APP_CERTIFICATE` | Agora Console, your project (App ID + Primary Certificate). Enables **live voice calls** |
@@ -181,14 +190,14 @@ What is verified: the Murf key and all 10 voices (live), the exact request sent 
 
 ```powershell
 cd backend
-.\.venv\Scripts\python.exe -m pytest                 # 364 pass + 1 skipped (PostgreSQL-only); SQLite in memory, no keys or network
+.\.venv\Scripts\python.exe -m pytest                 # 646 pass + 1 skipped (PostgreSQL-only); SQLite in memory, no keys or network
 ```
 
 Run the same suite on **PostgreSQL** (use a dedicated database whose name ends in `_test`; its tables are dropped before every test, and the run refuses any other name):
 
 ```powershell
 $env:TEST_DATABASE_URL = "postgresql+asyncpg://postgres:<password>@localhost:5432/voiceagent_test"
-.\.venv\Scripts\python.exe -m pytest                 # 365 pass, including the row-locking test for the reminder loop
+.\.venv\Scripts\python.exe -m pytest                 # 647 pass expected, including the row-locking test for the reminder loop
 ```
 
 ```powershell

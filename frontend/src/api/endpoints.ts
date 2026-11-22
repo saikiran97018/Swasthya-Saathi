@@ -5,12 +5,15 @@ import type {
   AgoraSessionBody,
   AgoraStatus,
   AppNotification,
+  BillingPlans,
+  BillingStatus,
   Appointment,
   ChatOut,
   Conversation,
   ConversationDetail,
   CreateAppointmentBody,
   Dashboard,
+  DoctorNote,
   EmergencyContact,
   EmergencyContactBody,
   Execution,
@@ -19,13 +22,21 @@ import type {
   FeedbackBody,
   Health,
   LanguageInfo,
+  MedicineReminder,
+  MedicineReminderBody,
   NotificationPage,
   Page,
   PlaceQuery,
   PlacesResult,
   Preferences,
   PreferencesUpdate,
+  ReplyRating,
+  ReplyReason,
+  PushConfig,
+  PushSubscribeBody,
   Provider,
+  SubscribeResult,
+  VerifyBody,
   ProviderQuery,
   ProviderSlots,
   SosInfo,
@@ -33,6 +44,7 @@ import type {
   TokenOut,
   Transcription,
   User,
+  VaccinationView,
 } from './types'
 
 export const api = {
@@ -100,6 +112,33 @@ export const api = {
   createFamilyMember: (body: FamilyMemberBody) => request<FamilyMember>('/family', { method: 'POST', json: body }),
   updateFamilyMember: (id: string, patch: Partial<FamilyMemberBody>) => request<FamilyMember>(`/family/${id}`, { method: 'PATCH', json: patch }),
   deleteFamilyMember: (id: string) => request<void>(`/family/${id}`, { method: 'DELETE', as: 'none' }),
+
+  // vaccination tracker and the note for the doctor
+  vaccinations: (memberId: string) => request<VaccinationView>(`/family/${memberId}/vaccinations`),
+  markVaccination: (memberId: string, milestone: string, givenOn: string | null) =>
+    request<VaccinationView>(`/family/${memberId}/vaccinations/${milestone}`, { method: 'PUT', json: { given_on: givenOn } }),
+  doctorNote: (conversationId: string) => request<DoctorNote>(`/conversations/${conversationId}/doctor-note`, { method: 'POST' }),
+
+  // medicine reminders and reply ratings
+  medicineReminders: () => request<MedicineReminder[]>('/medicine-reminders'),
+  addMedicineReminder: (body: MedicineReminderBody) => request<MedicineReminder>('/medicine-reminders', { method: 'POST', json: body }),
+  stopMedicineReminder: (series: string) => request<void>(`/medicine-reminders/${series}`, { method: 'DELETE', as: 'none' }),
+  rateReply: (messageId: string, body: { rating: ReplyRating; reason?: ReplyReason; note?: string }) =>
+    request<{ message_id: string; rating: ReplyRating; reason: ReplyReason | null }>(`/messages/${messageId}/feedback`, { method: 'PUT', json: body }),
+  clearReplyRating: (messageId: string) => request<void>(`/messages/${messageId}/feedback`, { method: 'DELETE', as: 'none' }),
+
+  // Saathi Plus (Razorpay)
+  billingPlans: () => request<BillingPlans>('/billing/plans'),
+  billingStatus: () => request<BillingStatus>('/billing/status'),
+  billingSubscribe: (plan: 'monthly' | 'yearly') => request<SubscribeResult>('/billing/subscribe', { method: 'POST', json: { plan } }),
+  billingVerify: (body: VerifyBody) => request<BillingStatus>('/billing/verify', { method: 'POST', json: body }),
+  billingCancel: () => request<BillingStatus>('/billing/cancel', { method: 'POST' }),
+
+  // phone notifications (Web Push)
+  pushConfig: () => request<PushConfig>('/push/config'),
+  pushSubscribe: (body: PushSubscribeBody) => request<PushConfig>('/push/subscriptions', { method: 'POST', json: body }),
+  pushUnsubscribe: (endpoint: string) => request<void>('/push/subscriptions', { method: 'DELETE', json: { endpoint }, as: 'none' }),
+  pushTest: () => request<{ sent: number }>('/push/test', { method: 'POST' }),
 
   // emergency / SOS
   emergencyContacts: () => request<EmergencyContact[]>('/emergency-contacts'),

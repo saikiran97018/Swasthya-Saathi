@@ -1,6 +1,5 @@
-import { useEffect, useState } from 'react'
-import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom'
-import { Activity, ChevronDown, ChevronRight } from 'lucide-react'
+import { Link, NavLink, useLocation } from 'react-router-dom'
+import { ChevronRight } from 'lucide-react'
 import { useMe } from '@/api/hooks'
 import { useChat } from '@/hooks/ChatProvider'
 import { InitialsBadge } from '@/components/health/Avatars'
@@ -11,25 +10,12 @@ import { LanguageSelector } from './LanguageSelector'
 import { NAV_ITEMS, isActive, resolveTo, type NavItem } from './nav'
 
 export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
-  const navigate = useNavigate()
   const { pathname } = useLocation()
-  const { state, startNew } = useChat()
+  const { state } = useChat()
   const { data: me } = useMe()
 
   const mainItems = NAV_ITEMS.filter((i) => i.group === 'main')
   const moreItems = NAV_ITEMS.filter((i) => i.group === 'more')
-  const moreActive = moreItems.some((i) => isActive(i, pathname))
-  // "More" is collapsed by default and opens by itself when you are on one of its screens.
-  const [moreOpen, setMoreOpen] = useState(moreActive)
-  useEffect(() => {
-    if (moreActive) setMoreOpen(true)
-  }, [moreActive])
-
-  const newConversation = () => {
-    startNew()
-    navigate('/chat')
-    onNavigate?.()
-  }
 
   const link = (item: NavItem) => {
     const Icon = item.icon
@@ -60,30 +46,9 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
           <Brand />
         </Link>
 
-        <button
-          onClick={newConversation}
-          className="flex h-12 shrink-0 items-center justify-center gap-2 rounded-full bg-accent px-4 text-sm font-semibold text-accent-fg shadow-sm transition hover:brightness-110 active:scale-[0.98]"
-        >
-          <Activity className="size-[18px]" aria-hidden /> New Conversation
-        </button>
-
         <nav aria-label="Main" className="flex shrink-0 flex-col gap-1">
           {mainItems.map(link)}
-          <button
-            type="button"
-            onClick={() => setMoreOpen((o) => !o)}
-            aria-expanded={moreOpen}
-            aria-controls="sidebar-more"
-            className="flex h-10 items-center gap-3 rounded-xl px-3 text-sm font-medium text-muted transition hover:bg-soft hover:text-fg"
-          >
-            <ChevronDown className={cn('size-5 transition', moreOpen && 'rotate-180')} aria-hidden />
-            More
-          </button>
-          {moreOpen && (
-            <div id="sidebar-more" className="flex flex-col gap-0.5 border-l border-line pl-2">
-              {moreItems.map(link)}
-            </div>
-          )}
+          {moreItems.map(link)}
         </nav>
       </div>
 

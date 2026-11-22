@@ -109,7 +109,7 @@ export default function HomePage() {
           </section>
 
           <p className="rounded-2xl border border-line bg-elev/70 px-4 py-3 text-xs leading-relaxed text-muted">
-            Swasthya Saathi gives general guidance, not a diagnosis, and it never replaces a doctor. Clinic details come from OpenStreetMap and may be incomplete: please phone to confirm a visit. In an emergency call 112 or 108.
+            Swasthya Saathi gives general guidance, not a diagnosis, and it never replaces a doctor. Clinic details may be incomplete: please phone to confirm a visit. In an emergency call 112 or 108.
           </p>
         </div>
 

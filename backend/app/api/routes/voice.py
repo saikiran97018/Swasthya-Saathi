@@ -10,6 +10,7 @@ from app.database.models import User
 from app.database.repositories.users import UserRepository
 from app.schemas.misc import SynthesizeIn, TranscribeOut
 from app.services.speech_service import SpeechService
+from app.utils.transcript import check_transcript
 
 router = APIRouter(prefix="/voice", tags=["voice"])
 
@@ -27,7 +28,10 @@ async def transcribe(
     result = await speech.transcribe(data, language)
     if not result.text:
         raise BadRequest("No speech was recognised. Please try again, closer to the microphone.", code="no_speech")
-    return TranscribeOut(text=result.text, language=result.language, duration_seconds=result.duration_seconds)
+    check = check_transcript(result.text)  # silence and noise come back from recognisers as invented captions or filler sounds
+    if not check.ok:
+        raise BadRequest("I could not make that out. Please say it again, a little closer to the microphone.", code="unclear_speech")
+    return TranscribeOut(text=check.text, language=result.language, duration_seconds=result.duration_seconds)
 
 
 @router.post("/synthesize", responses={200: {"content": {"audio/wav": {}}}})

@@ -3,7 +3,7 @@ import { dialable } from './sos'
 import { istDateKey } from './time'
 
 /** Plain-language labels for what a place is. */
-export const PLACE_KIND_LABEL: Record<PlaceKind, string> = { hospital: 'Hospital', clinic: 'Clinic', doctor: 'Doctor', phc: 'Health centre', other: 'Care place' }
+export const PLACE_KIND_LABEL: Record<PlaceKind, string> = { hospital: 'Hospital', clinic: 'Clinic', doctor: 'Doctor', phc: 'Health centre', pharmacy: 'Medical shop', other: 'Care place' }
 
 export const placeKindLabel = (k: string): string => PLACE_KIND_LABEL[k as PlaceKind] ?? 'Care place'
 
@@ -55,7 +55,7 @@ export function placeAddress(p: Pick<Place, 'address' | 'city'>): string {
 export interface PlaceFilters {
   city: string
   coords: { lat: number; lon: number } | null
-  kind: '' | 'hospital' | 'clinic' | 'doctor'
+  kind: '' | 'hospital' | 'clinic' | 'doctor' | 'pharmacy'
   q: string
   specialty?: string
 }
@@ -64,7 +64,7 @@ export interface PlaceFilters {
 export function placeQueryFrom(f: PlaceFilters): PlaceQuery | null {
   const city = f.city.trim()
   const q = f.q.trim()
-  const base: PlaceQuery = { ...(f.kind && { kind: f.kind }), ...(q && { q }), ...(f.specialty && { specialty: f.specialty }) }
+  const base: PlaceQuery = { ...(f.kind && { kind: f.kind }), ...(q && { q }), ...(f.specialty && f.kind !== 'pharmacy' && { specialty: f.specialty }) }
   if (f.coords) return { ...base, lat: Number(f.coords.lat.toFixed(5)), lon: Number(f.coords.lon.toFixed(5)) }
   if (city) return { ...base, city }
   return null

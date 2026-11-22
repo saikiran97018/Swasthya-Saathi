@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Bell, BellRing, CalendarCheck, CheckCheck, MessageSquareHeart, Repeat } from 'lucide-react'
+import { Bell, BellRing, CalendarCheck, CheckCheck, HeartPulse, MessageSquareHeart, Pill, Repeat, Syringe } from 'lucide-react'
 import { useMarkAllNotificationsRead, useMarkNotificationRead, useNotifications, usePlannedRefs } from '@/api/hooks'
 import type { AppNotification, NotificationKind } from '@/api/types'
 import { ConfirmationBadge } from '@/components/health/shared'
@@ -10,7 +10,7 @@ import { cn, relativeTime } from '@/lib/format'
 import { notificationPrefill, notificationTarget } from '@/lib/notifications'
 import { Skeleton } from '@/components/ui/primitives'
 
-const KIND_ICON: Record<NotificationKind, typeof Bell> = { appointment_reminder: CalendarCheck, follow_up: Repeat, feedback_request: MessageSquareHeart }
+const KIND_ICON: Record<NotificationKind, typeof Bell> = { appointment_reminder: CalendarCheck, follow_up: Repeat, feedback_request: MessageSquareHeart, medicine: Pill, symptom_checkin: HeartPulse, vaccine: Syringe }
 
 export const OPEN_NOTIFICATIONS_EVENT = 'swasthya:open-notifications'
 

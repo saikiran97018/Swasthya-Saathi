@@ -23,6 +23,7 @@ class FamilyMemberIn(BaseModel):
     name: str = Field(max_length=80)
     relation: Relation = "other"
     birth_year: int | None = Field(default=None, ge=1900)
+    birth_date: date | None = Field(default=None, description="Exact date of birth (optional): needed for a child's vaccination schedule")
     gender: Gender | None = None
     mobile: str | None = Field(default=None, max_length=20, description="10-digit Indian mobile; optional")
     language: str | None = Field(default=None, max_length=8)
@@ -43,6 +44,7 @@ class FamilyMemberUpdate(BaseModel):
     name: str | None = Field(default=None, max_length=80)
     relation: Relation | None = None
     birth_year: int | None = Field(default=None, ge=1900)
+    birth_date: date | None = None
     gender: Gender | None = None
     mobile: str | None = Field(default=None, max_length=20)
     language: str | None = Field(default=None, max_length=8)
@@ -67,6 +69,7 @@ class FamilyMemberOut(BaseModel):
     name: str
     relation: Relation
     birth_year: int | None
+    birth_date: date | None = None
     gender: Gender | None
     mobile: str | None
     language: str | None
@@ -122,14 +125,14 @@ class SosFacility(BaseModel):
     lat: float | None = None
     lon: float | None = None
     distance_km: float | None = None
-    source: Literal["openstreetmap", "partner"] = "openstreetmap"
+    source: Literal["openstreetmap", "google", "partner"] = "openstreetmap"
 
 
 # ---------------------------------------------------------------- places search
 class PlaceOut(BaseModel):
-    id: str = Field(description="'osm:node/123' for OpenStreetMap places, or the partner clinic's provider code")
+    id: str = Field(description="'osm:node/123' (OpenStreetMap) or 'gmaps:<id>' (Google), or the partner clinic's provider code")
     name: str
-    kind: Literal["hospital", "clinic", "doctor", "phc", "other"]
+    kind: Literal["hospital", "clinic", "doctor", "phc", "pharmacy", "other"]
     specialties: list[str] = []
     address: str | None = None
     city: str | None = None
@@ -140,7 +143,10 @@ class PlaceOut(BaseModel):
     lon: float | None = None
     distance_km: float | None = None
     emergency: bool = False
-    source: Literal["openstreetmap", "partner"]
+    rating: float | None = Field(default=None, description="Google rating out of 5 (Google results only)")
+    rating_count: int | None = None
+    maps_url: str | None = Field(default=None, description="The place on Google Maps (Google results only)")
+    source: Literal["openstreetmap", "google", "partner"]
     has_slots: bool = Field(description="True only for partner clinics with online appointment slots")
     provider_code: str | None = Field(default=None, description="Set for partner clinics; OpenStreetMap places are booked through place_id")
 

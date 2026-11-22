@@ -12,6 +12,7 @@ import logging
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.repositories.knowledge import DirectoryRepository, KnowledgeRepository
+from app.database.knowledge_extra import EXTRA_KNOWLEDGE
 from app.database.repositories.providers import ProviderRepository
 
 log = logging.getLogger("app.seed")
@@ -212,10 +213,14 @@ async def seed_if_empty(session: AsyncSession, *, include_demo_providers: bool =
     """Knowledge base + helpline directory when empty. The invented sample clinics are added ONLY when asked for
     (SEED_DEMO_PROVIDERS=true), for demos and tests: real places come from OpenStreetMap."""
     kb = KnowledgeRepository(session)
-    if await kb.is_empty():
-        for doc in KNOWLEDGE:
+    have = await kb.titles()
+    added = 0
+    for doc in [*KNOWLEDGE, *EXTRA_KNOWLEDGE]:  # new documents reach existing databases too, matched by title
+        if doc["title"] not in have:
             await kb.add_document(**doc)
-        log.info("Seeded %d knowledge documents", len(KNOWLEDGE))
+            added += 1
+    if added:
+        log.info("Seeded %d knowledge documents", added)
     directory = DirectoryRepository(session)
     if await directory.is_empty():
         for entry in DIRECTORY:

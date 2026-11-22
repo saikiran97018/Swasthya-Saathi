@@ -25,6 +25,8 @@ from app.database.repositories.conversations import ConversationRepository
 from app.database.repositories.executions import ExecutionRepository
 from app.database.repositories.users import UserRepository
 from app.schemas.conversation import ConversationOut, MessageOut
+from app.services.billing import check_message_allowed
+from app.utils.transcript import check_transcript
 from app.services.llm_service import LLMService
 from app.utils.language import detect_script_language, normalise_language, same_script_family
 
@@ -52,10 +54,17 @@ class AgentService:
         voice_output: bool = False,
     ) -> AsyncIterator[Event]:
         text = (text or "").strip()
+        if text and input_mode == "voice":  # never act on text a recogniser invented from noise
+            heard = check_transcript(text)
+            if not heard.ok:
+                raise BadRequest("I could not make that out. Please say it again.", code="unclear_speech")
+            text = heard.text
         if not text:
             raise BadRequest("Message is empty")
         if len(text) > self.s.max_message_chars:
             raise BadRequest(f"Message is longer than {self.s.max_message_chars} characters")
+
+        await check_message_allowed(session, self.s, user)  # free plan: a daily limit (no-op until Razorpay is set up)
 
         repo = ConversationRepository(session)
         prefs = await UserRepository(session).get_preferences(user.id)

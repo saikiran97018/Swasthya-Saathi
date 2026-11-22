@@ -44,6 +44,8 @@ export function CallTranscript({ conversationId, live }: { conversationId: strin
     if (stick.current) scroller.current?.scrollTo({ top: scroller.current.scrollHeight, behavior: 'smooth' })
   }, [messages.length, awaiting, messages.at(-1)?.content])
 
+  if (!live && !isLoading && !isError && messages.length === 0) return null // an ended call with nothing said has no transcript to show
+
   return (
     <section aria-labelledby="transcript-h" className="card overflow-hidden">
       <div className="flex items-center justify-between gap-3 border-b border-line px-4 py-3">
@@ -79,7 +81,7 @@ export function CallTranscript({ conversationId, live }: { conversationId: strin
             <Skeleton className="ml-auto h-10 w-1/2" />
           </div>
         ) : messages.length === 0 ? (
-          <p className="py-6 text-center text-sm text-muted">{isError ? 'The transcript could not be loaded yet. It will keep trying.' : live ? 'What you and your assistant say will appear here.' : 'Nothing was said in this call.'}</p>
+          <p className="py-6 text-center text-sm text-muted">{isError ? 'The transcript could not be loaded yet. It will keep trying.' : 'What you and your assistant say will appear here.'}</p>
         ) : (
           <div className="flex flex-col gap-5">
             {messages.map((m) => (
