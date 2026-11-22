@@ -87,6 +87,13 @@ def test_the_reply_language_must_match_the_persons_language():
     assert "wrong_language" in check("ABHA అంటే Ayushman Bharat Health Account. ఇది free 14-digit digital health ID, మీరు ఉపయోగించవచ్చు.", language="en").problems
 
 
+def test_names_copied_from_the_data_do_not_make_a_reply_the_wrong_language():
+    kannada = "ಸರ್ಕಾರಿ ಆಸ್ಪತ್ರೆ ಬೆಂಗಳೂರು ಜಿಲ್ಲಾ ಆಸ್ಪತ್ರೆ"
+    reply = f"కర్ణాటకలో {kannada} ఉంది. దానికి ఫోన్ చేసి సమయం నిర్ధారించుకోండి."
+    assert check(reply, language="te", grounding=GROUND + " " + kannada).ok  # the name came from the search results
+    assert "wrong_language" in check(f"{kannada} {kannada} {kannada}", language="te", grounding="plain").problems  # nothing like it in the data
+
+
 def test_a_word_mixing_two_scripts_is_a_garbled_reply():
     assert "wrong_language" in check("क्या आप अभी ज్वर के लिए किसी डॉक्टर को दिखाना चाहते हैं? अपना शहर बताइए।", language="hi").problems
     assert check("क्या आप अभी बुखार के लिए किसी डॉक्टर को दिखाना चाहते हैं? अपना शहर बताइए।", language="hi").ok

@@ -117,8 +117,15 @@ def garbled_words(text: str) -> list[str]:
     return bad
 
 
-def wrong_script(text: str, language: str) -> bool:
+def without_copied_names(text: str, grounding: str) -> str:
+    """The text minus the words copied exactly from the data the assistant was given: a clinic called 'ಸರ್ಕಾರಿ ಆಸ್ಪತ್ರೆ' keeps its Kannada
+    name inside a Telugu answer, and that is correct, not a wrong-language reply."""
+    return " ".join(w for w in text.split() if w.strip(".,;:!?()[]\"'।") not in grounding)
+
+
+def wrong_script(text: str, language: str, grounding: str = "") -> bool:
     """True when a reply of any real length is mostly in another writing system than `language` (code-mixed replies pass)."""
+    text = without_copied_names(text, grounding) if grounding else text
     expected = _LANG_SCRIPT.get(language)
     shares = script_shares(text)
     if expected is None or sum(1 for c in text if c.isalpha()) < 25:
@@ -189,7 +196,7 @@ def validate_response(text: str, *, language: str, voice: bool, intent: str, gro
     if any(ref.group(0).upper() not in grounding.upper() for ref in _REF.finditer(t)):
         v.problems.append("ungrounded_ref")
 
-    if wrong_script(t, language) or garbled_words(t):
+    if wrong_script(t, language, grounding) or garbled_words(without_copied_names(t, grounding)):
         v.problems.append("wrong_language")
 
     if intent == "emergency" and not re.search(r"\b(?:112|108)\b|112|108", t):
