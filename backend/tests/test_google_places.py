@@ -133,6 +133,23 @@ def test_an_empty_google_answer_also_falls_back_to_openstreetmap():
         assert len(mapped(search(c).json())) == 4
 
 
+def health(c) -> dict:
+    return c.get(f"{P}/health").json()
+
+
+def test_health_says_where_places_come_from_and_whether_google_works():
+    with make(FakeGoogle(), google_maps_api_key=KEY) as c:
+        assert health(c)["places_provider"] == "google" and health(c)["google_places_status"] == "untested"
+        search(c, kind="pharmacy")
+        assert health(c)["google_places_status"] == "ok"
+    with make(FakeGoogle(status=403), google_maps_api_key=KEY) as c:
+        search(c)
+        h = health(c)
+        assert h["places_provider"] == "google" and h["google_places_status"].startswith("error: HTTP 403") and "not been used" in h["google_places_status"] and KEY not in str(h)
+    with make(FakeGoogle()) as c:
+        assert health(c)["places_provider"] == "openstreetmap" and health(c)["google_places_status"] == "off"
+
+
 def test_parse_skips_bad_rows():
     assert PlacesService.parse_google({"id": "short", "displayName": {"text": "x"}, "location": {"latitude": 1, "longitude": 2}}) is None  # a place id that is not one
     assert PlacesService.parse_google({"id": ID1, "displayName": {"text": ""}, "location": {"latitude": 1, "longitude": 2}}) is None

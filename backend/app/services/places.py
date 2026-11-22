@@ -247,6 +247,8 @@ class PlacesService:
         self._geo: dict[str, tuple[float, float, str | None, float]] = {}
         self._near: dict[tuple[float, float, int, str], tuple[list[Place], float]] = {}
         self._by_id: dict[str, tuple[Place, float]] = {}
+        # What the last Google call did, for the health page: off | untested | ok | error: HTTP 403 <reason>. Never contains the key.
+        self.google_status = "untested" if settings.google_places_active else "off"
 
     # ------------------------------------------------------------------ helpers
     @property
@@ -373,6 +375,7 @@ class PlacesService:
         try:
             resp = await self.http.post(f"{self.s.google_places_url}/places:searchNearby", json=body, headers=self._g_headers(self._G_FIELDS), timeout=self.s.places_timeout_seconds)
         except httpx.HTTPError as exc:
+            self.google_status = f"error: could not reach Google ({type(exc).__name__})"
             raise UpstreamError("Could not reach Google Maps.", retryable=True, code="places_unavailable") from exc
         if resp.status_code != 200:
             try:
@@ -380,11 +383,14 @@ class PlacesService:
             except ValueError:
                 why = ""
             log.warning("Google Places failed: HTTP %s %s", resp.status_code, why)  # the key is never logged
+            self.google_status = f"error: HTTP {resp.status_code} {why}".strip()[:200]
             raise UpstreamError("Google Maps could not answer.", retryable=resp.status_code >= 500 or resp.status_code == 429, code="places_unavailable")
         try:
             rows = resp.json().get("places") or []
         except ValueError as exc:
+            self.google_status = "error: unreadable answer"
             raise UpstreamError("Google Maps sent an unreadable answer.", retryable=True, code="places_unavailable") from exc
+        self.google_status = "ok"
         wanted = {"hospital": ("hospital",), "clinic": ("clinic", "phc", "doctor"), "doctor": ("doctor",), "pharmacy": ("pharmacy",)}.get(kind or "")
         out: dict[str, Place] = {}
         for row in rows:

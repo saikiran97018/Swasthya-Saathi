@@ -32,6 +32,8 @@ async def health(request: Request, session: AsyncSession = Depends(get_session, 
         llm_model=settings.llm_model if settings.llm_primary_configured else settings.llm_fallback_model,
         llm_fallback_model=settings.llm_fallback_model if settings.llm_fallback_configured and settings.llm_primary_configured else None,
         web_search_configured=settings.web_search_configured,
+        places_provider="google" if settings.google_places_active else "openstreetmap",
+        google_places_status=getattr(request.app.state.places, "google_status", "off"),
         demo_mode=settings.demo_mode,
         version=VERSION,
     )

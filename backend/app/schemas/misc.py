@@ -337,6 +337,8 @@ class HealthOut(BaseModel):
     llm_model: str
     llm_fallback_model: str | None = Field(default=None, description="Model used automatically when the primary model fails")
     web_search_configured: bool
+    places_provider: Literal["google", "openstreetmap"] = Field(default="openstreetmap", description="Where clinics and shops come from; Google when GOOGLE_MAPS_API_KEY is set")
+    google_places_status: str = Field(default="off", description="off | untested (no search yet) | ok | error: <what Google said>. Never contains the key")
     demo_mode: bool = Field(description="True when demo helpers (simulate visit / remind now) and sample provider data are enabled")
     version: str
 
