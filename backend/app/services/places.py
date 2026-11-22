@@ -440,6 +440,9 @@ class PlacesService:
                     places = await self._google_nearby(lat, lon, radius_km, kind)
                 except UpstreamError:
                     log.warning("Google Places failed; using OpenStreetMap for this search")
+                except Exception as exc:  # a search must never fail because of the extra source: anything unexpected also falls back
+                    self.google_status = f"error: unexpected {type(exc).__name__}"
+                    log.exception("Google Places crashed; using OpenStreetMap for this search")
             if not places and self.s.overpass_url:  # optional: complete lists for big cities. Any failure falls back to Nominatim.
                 try:
                     seen: dict[str, Place] = {}

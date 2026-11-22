@@ -178,3 +178,19 @@ def test_a_google_place_id_that_is_not_one_is_refused():
         d = datetime.now(sched.IST).date() + timedelta(days=1)
         r = c.post(f"{P}/appointments", json={"place_id": "gmaps:../../etc", "slot_start": f"{d.isoformat()} 11:00", "patient_name": "Ravi Kumar", "patient_mobile": "9876543210", "reason": "x"}, headers=h)
         assert r.status_code in (400, 404, 422)
+
+
+def test_a_key_pasted_with_stray_characters_is_cleaned():
+    s = Settings(_env_file=None, google_maps_api_key='  "AIza-test​ key"\r\n ', razorpay_key_id=" rzp_test_abc\n")
+    assert s.google_maps_api_key == "AIza-testkey" and s.razorpay_key_id == "rzp_test_abc"
+
+
+def test_google_failing_in_an_unexpected_way_never_breaks_a_search(monkeypatch):
+    async def boom(self, *a, **k):
+        raise UnicodeEncodeError("ascii", "x", 0, 1, "bad header")  # for example a key with a character that cannot go in a header
+
+    monkeypatch.setattr(PlacesService, "_google_nearby", boom)
+    with make(FakeGoogle(), google_maps_api_key=KEY) as c:
+        r = search(c)
+        assert r.status_code == 200 and len(mapped(r.json())) == 4 and all(p["source"] == "openstreetmap" for p in mapped(r.json()))
+        assert health(c)["google_places_status"] == "error: unexpected UnicodeEncodeError"

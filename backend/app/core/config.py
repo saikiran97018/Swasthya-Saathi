@@ -204,6 +204,12 @@ class Settings(BaseSettings):
             v = "postgresql+asyncpg://" + v[len("postgresql://"):]
         return v
 
+    @field_validator("google_maps_api_key", "razorpay_key_id", "razorpay_key_secret", "razorpay_webhook_secret", "twilio_account_sid", "twilio_auth_token", mode="after")
+    @classmethod
+    def _clean_pasted_key(cls, v: str) -> str:
+        """A key pasted into a dashboard often carries a stray space, newline, quote or invisible character, which breaks the HTTP header."""
+        return "".join(c for c in (v or "") if "!" <= c <= "~" and c not in "\"'")
+
     @model_validator(mode="after")
     def _check_production_secrets(self) -> "Settings":
         if self.environment == "production" and self.jwt_secret == _DEFAULT_JWT_SECRET:

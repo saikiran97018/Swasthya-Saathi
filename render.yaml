@@ -57,15 +57,10 @@ services:
 
       # ---- speech ----
       # Sarvam (Saaras speech-to-text + Bulbul text-to-speech) is the only speech provider: the best accuracy for Indian languages.
-      # Bhashini is switched off; to use it again, set SPEECH_PROVIDER=bhashini and add the two keys below.
       - key: SPEECH_PROVIDER
         value: sarvam
       - key: SPEECH_FALLBACK_PROVIDER
         value: none
-      # - key: BHASHINI_USER_ID
-      #   sync: false
-      # - key: BHASHINI_ULCA_API_KEY
-      #   sync: false
       - key: SARVAM_API_KEY # the same Sarvam key as above
         sync: false
 
